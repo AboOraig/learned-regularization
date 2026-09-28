@@ -35,7 +35,8 @@ else:
 conds = ([dict(n_angles=20, sigma=s) for s in [0, 0.01, 0.05, 0.1, 0.2]] if args.exp == "noise"
          else [dict(n_angles=a, sigma=0.05) for a in [5, 10, 20, 40, 90]])
 key = "sigma" if args.exp == "noise" else "n_angles"
-GRIDS = {"Tikhonov": np.logspace(-5, 0, 11), "TV": np.logspace(-5, -1, 9)}
+from src.experiment import LAM_TIK, LAM_TV
+GRIDS = {"Tikhonov": LAM_TIK, "TV": LAM_TV}
 
 rows = []
 for c in conds:

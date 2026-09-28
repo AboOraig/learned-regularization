@@ -1,0 +1,2 @@
+| experiment   | sigma   | n_angles   | kind   | delta   | dataset   | method   | psnr_mean   | psnr_sem   | ssim_mean   | ssim_sem   |
+|--------------|---------|------------|--------|---------|-----------|----------|-------------|------------|-------------|------------|

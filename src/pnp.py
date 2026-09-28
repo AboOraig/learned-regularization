@@ -13,6 +13,8 @@ def pnp_pgd(model_op, y, denoiser, sigma_d, eta, checkpoints=(100,), x_true=None
     Returns ({iter: x}, history) ; history has data residual (and PSNR if x_true given) per iteration."""
     x = model_op.fbp(y).clamp(0, 1)
     out, hist = {}, {"residual": [], "psnr": []}
+    if 0 in checkpoints:  # control: no data-consistency iterations at all
+        out[0] = denoise(denoiser, x, sigma_d)
     for k in range(1, max(checkpoints) + 1):
         grad = model_op.adjoint(model_op.forward(x) - y)
         x = denoise(denoiser, x - eta * grad, sigma_d)

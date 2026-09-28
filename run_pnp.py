@@ -21,7 +21,7 @@ _, val, test = load_mnist(); val, test = val[:a.n_val].to(dev), test[:a.n_test].
 den = load_denoiser(a.model, dev)
 conds = ([dict(n_angles=20, sigma=s) for s in [0, 0.01, 0.05, 0.1, 0.2]] if a.exp == "noise"
          else [dict(n_angles=n, sigma=0.05) for n in [5, 10, 20, 40, 90]])
-SD, CK = [0.005, 0.01, 0.02, 0.05, 0.1, 0.15, 0.2, 0.3], (5, 10, 25, 50, 100, 200, 400)
+from src.experiment import SD, CK
 
 rows, abl = [], []
 for c in conds:

@@ -4,10 +4,10 @@ from .baselines import Tikhonov, TVADMM
 from .pnp import pnp_pgd
 from .metrics import per_image_metrics
 
-LAM_TIK = np.logspace(-5, 0, 11)
-LAM_TV = np.logspace(-5, -1, 9)
+LAM_TIK = np.logspace(-5, 0, 21)
+LAM_TV = np.logspace(-5, -1, 17)
 SD = [0.005, 0.01, 0.02, 0.05, 0.1, 0.15, 0.2, 0.3]
-CK = (5, 10, 25, 50, 100, 200, 400)
+CK = (0, 1, 2, 3, 5, 10, 25, 50, 100, 200, 400)
 
 
 def tune_all(op, den, val, yv):
