@@ -18,7 +18,7 @@ class DnCNN(nn.Module):
 
 
 def load_denoiser(path, device="cpu"):
-    ck = torch.load(path, map_location=device)
+    ck = torch.load(path, map_location=device, weights_only=True)
     m = DnCNN(**ck["config"]).to(device)
     m.load_state_dict(ck["state"]); m.eval()
     return m

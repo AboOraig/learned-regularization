@@ -21,7 +21,7 @@ _, val, test = load_mnist(); val, test = val[:a.n_val].to(dev), test[:a.n_test].
 den = load_denoiser(a.model, dev)
 conds = ([dict(n_angles=20, sigma=s) for s in [0, 0.01, 0.05, 0.1, 0.2]] if a.exp == "noise"
          else [dict(n_angles=n, sigma=0.05) for n in [5, 10, 20, 40, 90]])
-SD, CK = [0.02, 0.05, 0.1, 0.15, 0.2], (25, 50, 100, 200)
+SD, CK = [0.005, 0.01, 0.02, 0.05, 0.1, 0.15, 0.2, 0.3], (5, 10, 25, 50, 100, 200, 400)
 
 rows, abl = [], []
 for c in conds:
@@ -39,6 +39,7 @@ for c in conds:
     ps, ss, rel = per_image_metrics(outs[k], test)
     for i in range(len(ps)):
         rows.append(dict(method="PnP-DnCNN", **c, param=f"sd={sd},k={k}", img=i, psnr=ps[i], ssim=ss[i], rel=rel[i]))
+    if sd in (SD[0], SD[-1]) or k in (CK[0], CK[-1]): print("  WARNING: PnP hyperparameter at grid edge")
     print(f"{c} PnP sigma_d={sd} iters={k} PSNR={ps.mean():.2f} SSIM={ss.mean():.3f}")
 
 os.makedirs("results", exist_ok=True)
