@@ -58,6 +58,18 @@ near-noiseless, well-posed regime TV wins clearly (-6.4 dB), because
 its assumption (piecewise-constant images) is closer to exact for
 MNIST digits than the CNN prior's implicit assumption.
 
+![Reconstruction accuracy vs. noise level, all four methods](results/comparison_noise.png)
+**Figure: PSNR and SSIM vs. measurement noise (20 angles).** TV leads
+at low noise (sigma <= 0.01); PnP-DnCNN overtakes all classical
+baselines from sigma = 0.05 upward. Error bars: 95% CI over 200 test
+images.
+
+![Reconstruction accuracy vs. number of angles, all four methods](results/comparison_angles.png)
+**Figure: PSNR and SSIM vs. number of projection angles (sigma=0.05).**
+PnP-DnCNN leads across the entire range tested, with the largest
+relative advantage under the most severe angular undersampling (5
+angles). Error bars: 95% CI over 200 test images.
+
 ## 3. Why so few PnP iterations? (E5 ablation)
 
 Validation tuning consistently selects very few PnP iterations
