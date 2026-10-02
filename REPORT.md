@@ -70,6 +70,14 @@ PnP-DnCNN leads across the entire range tested, with the largest
 relative advantage under the most severe angular undersampling (5
 angles). Error bars: 95% CI over 200 test images.
 
+![Qualitative reconstruction grid](results/fig_recon_grid.png)
+**Figure: Qualitative reconstructions (sigma=0.05, 20 angles).** Rows
+are individual test digits; columns show ground truth, the three
+classical baselines, PnP-DnCNN, and the absolute error map for
+PnP-DnCNN. FBP and Tikhonov retain visible noise; TV looks blocky;
+PnP-DnCNN is visually closest to the ground truth. Error is
+concentrated on stroke edges, not flat regions.
+
 ## 3. Why so few PnP iterations? (E5 ablation)
 
 Validation tuning consistently selects very few PnP iterations
