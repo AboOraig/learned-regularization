@@ -115,6 +115,14 @@ values, not re-tuned per mismatch level.
   degrade less (PnP: 24.0 -> 22.2; TV: 20.2 -> 19.2), and PnP remains
   clearly ahead.
 
+![Robustness to forward-model mismatch](results/robust_mismatch.png)
+**Figure: PSNR vs. angular error under forward-model mismatch**
+(left: constant offset; right: per-angle jitter). Hyperparameters are
+frozen at their delta=0 values. PnP-DnCNN stays ahead of all classical
+baselines throughout, but loses ground faster than TV as the offset
+grows, with its margin over TV shrinking from +3.85 dB at delta=0 to
++1.48 dB at delta=4 degrees. Error bars: 95% CI over 200 test images.
+
 **Finding 3.** The learned prior is more sensitive to systematic
 (rigid) forward-model error than TV is, even though it remains more
 accurate in absolute terms over the tested range. A plausible
