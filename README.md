@@ -34,6 +34,18 @@ regularization (FBP, Tikhonov, TV).
 | 5 angles, sigma=0.05 (PSNR) | 9.1 | 14.2 | 15.5 | **17.7** |
 | Fashion-MNIST shift (PSNR) | 14.9 | 16.7 | **19.6** | 16.5 |
 
+![Reconstruction accuracy vs. noise level, all four methods](results/comparison_noise.png)
+**Figure: PSNR and SSIM vs. measurement noise (20 angles).** TV leads
+at low noise (sigma <= 0.01); PnP-DnCNN overtakes all classical
+baselines from sigma = 0.05 upward. Error bars: 95% CI over 200 test
+images.
+
+![Reconstruction accuracy vs. number of angles, all four methods](results/comparison_angles.png)
+**Figure: PSNR and SSIM vs. number of projection angles (sigma=0.05).**
+PnP-DnCNN leads across the entire range tested, with the largest
+relative advantage under the most severe angular undersampling (5
+angles). Error bars: 95% CI over 200 test images.
+
 Full tables and statistical tests (paired Wilcoxon, 95% CIs) in
 [REPORT.md](REPORT.md) and `results/summary_table.md`.
 
