@@ -145,6 +145,15 @@ draws).
 | Fashion-MNIST (far-shift) | **19.6** | 16.5 | -3.1 dB |
 | Shepp-Logan phantom (far-shift) | **19.2** | 15.0 | -4.2 dB |
 
+![Robustness to distribution shift](results/robust_shift.png)
+**Figure: PSNR under train-test distribution shift**, frozen pipeline
+(sigma=0.05, 20 angles). PnP-DnCNN leads on MNIST (in-distribution)
+and EMNIST (near-shift), but drops below every classical baseline on
+Fashion-MNIST and the Shepp-Logan phantom (far-shift). TV is the most
+consistent method across all four sets. Note: the Shepp-Logan error
+bar reflects noise-draw variation on a single image, not image-to-image
+variation like the other three bars.
+
 **Finding 4.** The prior generalizes to EMNIST letters, which share
 digits' stroke-like statistics, but fails on Fashion-MNIST and the
 Shepp-Logan phantom, both structurally unlike digits. `fig_shift_grid.png`
