@@ -7,7 +7,7 @@ optimization-based reconstruction framework via Plug-and-Play
 proximal gradient (PnP-PGD), and compared against classical
 regularization (FBP, Tikhonov, TV).
 
-**Full write-up with all results and discussion: [REPORT.md](REPORT.md).**
+**Full write-up with all results and discussion: [REPORT.md](REPORT.md), and documented in the technical paper [Learned Regularization](./paper/Learned_Regularization.pdf).**
 
 ## TL;DR results
 
