@@ -58,6 +58,26 @@ near-noiseless, well-posed regime TV wins clearly (-6.4 dB), because
 its assumption (piecewise-constant images) is closer to exact for
 MNIST digits than the CNN prior's implicit assumption.
 
+![Reconstruction accuracy vs. noise level, all four methods](results/comparison_noise.png)
+**Figure: PSNR and SSIM vs. measurement noise (20 angles).** TV leads
+at low noise (sigma <= 0.01); PnP-DnCNN overtakes all classical
+baselines from sigma = 0.05 upward. Error bars: 95% CI over 200 test
+images.
+
+![Reconstruction accuracy vs. number of angles, all four methods](results/comparison_angles.png)
+**Figure: PSNR and SSIM vs. number of projection angles (sigma=0.05).**
+PnP-DnCNN leads across the entire range tested, with the largest
+relative advantage under the most severe angular undersampling (5
+angles). Error bars: 95% CI over 200 test images.
+
+![Qualitative reconstruction grid](results/fig_recon_grid.png)
+**Figure: Qualitative reconstructions (sigma=0.05, 20 angles).** Rows
+are individual test digits; columns show ground truth, the three
+classical baselines, PnP-DnCNN, and the absolute error map for
+PnP-DnCNN. FBP and Tikhonov retain visible noise; TV looks blocky;
+PnP-DnCNN is visually closest to the ground truth. Error is
+concentrated on stroke edges, not flat regions.
+
 ## 3. Why so few PnP iterations? (E5 ablation)
 
 Validation tuning consistently selects very few PnP iterations
@@ -95,6 +115,14 @@ values, not re-tuned per mismatch level.
   degrade less (PnP: 24.0 -> 22.2; TV: 20.2 -> 19.2), and PnP remains
   clearly ahead.
 
+![Robustness to forward-model mismatch](results/robust_mismatch.png)
+**Figure: PSNR vs. angular error under forward-model mismatch**
+(left: constant offset; right: per-angle jitter). Hyperparameters are
+frozen at their delta=0 values. PnP-DnCNN stays ahead of all classical
+baselines throughout, but loses ground faster than TV as the offset
+grows, with its margin over TV shrinking from +3.85 dB at delta=0 to
++1.48 dB at delta=4 degrees. Error bars: 95% CI over 200 test images.
+
 **Finding 3.** The learned prior is more sensitive to systematic
 (rigid) forward-model error than TV is, even though it remains more
 accurate in absolute terms over the tested range. A plausible
@@ -116,6 +144,15 @@ draws).
 | EMNIST letters (near-shift) | 20.1 | **22.0** | +1.9 dB |
 | Fashion-MNIST (far-shift) | **19.6** | 16.5 | -3.1 dB |
 | Shepp-Logan phantom (far-shift) | **19.2** | 15.0 | -4.2 dB |
+
+![Robustness to distribution shift](results/robust_shift.png)
+**Figure: PSNR under train-test distribution shift**, frozen pipeline
+(sigma=0.05, 20 angles). PnP-DnCNN leads on MNIST (in-distribution)
+and EMNIST (near-shift), but drops below every classical baseline on
+Fashion-MNIST and the Shepp-Logan phantom (far-shift). TV is the most
+consistent method across all four sets. Note: the Shepp-Logan error
+bar reflects noise-draw variation on a single image, not image-to-image
+variation like the other three bars.
 
 **Finding 4.** The prior generalizes to EMNIST letters, which share
 digits' stroke-like statistics, but fails on Fashion-MNIST and the
