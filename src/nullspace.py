@@ -1,0 +1,93 @@
+"""Null-space / weakly-determined-subspace analysis of the sparse-view operator A (m x n).
+
+Why: the measurements y = A x + n only constrain the components of x along the right singular
+vectors of A with non-negligible singular values. The remaining directions (the exact null space and
+the weakly-determined directions) are filled in by the PRIOR. Error and energy in that subspace is
+therefore a direct, prior-attributable measure of "hallucination" (cf. Bhadra et al., 2021).
+
+Notes on interpretation
+- PnP-PGD's gradient step x - eta*A^T(Ax - y) never changes the exact-null-space component, so
+  null-space content of a PnP output comes from the denoiser (and the FBP initialisation) only.
+  This is checked in tests/test_nullspace.py.
+- All metrics are computed on the reconstructions CLAMPED to [0, 1], exactly like PSNR/SSIM in
+  src/metrics.py. Clamping is non-linear and can itself add null-space content; it is applied to
+  every method identically.
+- The subspace is defined by a threshold on singular values relative to the largest one, so it
+  depends on the operator (angles, geometry) and on the threshold. Report several thresholds.
+"""
+import numpy as np
+import torch
+
+# name -> relative singular-value threshold tau. Subspace = {right singular vectors with s_i < tau * s_max}.
+# "null" is the numerically exact null space; the others add weakly-determined directions.
+# NOTE: for the 28x28 / 20-angle operator the spectrum has 79 singular values at ~1e-16 (exact null), then a
+# CONTINUUM from ~5e-9 to 1e-2 (relative) with no gap. A cut of 1e-10 isolates the 79 exact ones with a ~1e7 gap;
+# a cut such as 1e-8 or 1e-6 would land inside the continuum and give a different (arbitrary) dimension.
+SUBSPACES = {"null": 1e-10, "tau0.05": 0.05, "tau0.10": 0.10}
+
+
+def _np(x):
+    if torch.is_tensor(x):
+        return x.detach().cpu().double().numpy()
+    return np.asarray(x, dtype=np.float64)
+
+
+class OperatorSubspaces:
+    """SVD of the dense operator matrix A (m x n) and projections onto its weakly-determined subspaces."""
+
+    def __init__(self, A):
+        A = _np(A)
+        m, n = A.shape
+        _, S, Vt = np.linalg.svd(A, full_matrices=True)   # Vt: (n, n)
+        self.n = n
+        self.S = np.zeros(n)
+        self.S[:len(S)] = S                                # if m < n the remaining singular values are exactly 0
+        self.V = Vt.T                                      # columns: right singular vectors, decreasing s
+        self.smax = float(S[0])
+
+    def mask(self, tau):
+        return self.S < tau * self.smax
+
+    def dim(self, tau):
+        return int(self.mask(tau).sum())
+
+    def basis(self, tau):
+        return self.V[:, self.mask(tau)]                   # (n, d)
+
+    def project(self, X, tau):
+        """Orthogonal projection of each row of X (B, n) onto the subspace."""
+        Vw = self.basis(tau)
+        X = _np(X)
+        return (X @ Vw) @ Vw.T
+
+    def gap_report(self, tau=SUBSPACES["null"]):
+        """Singular values just above/below the 'null' cut, to check the cut sits in a clear gap."""
+        below = self.S[self.S < tau * self.smax]
+        above = self.S[self.S >= tau * self.smax]
+        return dict(n_null=len(below), largest_below=float(below.max()) if len(below) else 0.0,
+                    smallest_above=float(above.min()) if len(above) else 0.0)
+
+
+def subspace_metrics(subs, x_hat, x_true, tau):
+    """Per-image arrays (length B) describing what happens inside the subspace.
+
+    null_err_energy : ||P (x_hat - x)||^2        error the data cannot see (prior-driven)
+    total_err_energy: ||x_hat - x||^2
+    null_err_frac   : null_err_energy / total_err_energy
+    null_err_rel    : ||P (x_hat - x)|| / ||x||
+    recon_energy    : ||P x_hat||^2              energy the method puts into the subspace
+    true_energy     : ||P x||^2                  energy the true image actually has there
+    """
+    xh, xt = _np(x_hat), _np(x_true)
+    e = xh - xt
+    Pe, Pxh, Pxt = subs.project(e, tau), subs.project(xh, tau), subs.project(xt, tau)
+    null_e = (Pe ** 2).sum(1)
+    tot_e = (e ** 2).sum(1)
+    return dict(
+        null_err_energy=null_e,
+        total_err_energy=tot_e,
+        null_err_frac=null_e / np.maximum(tot_e, 1e-12),
+        null_err_rel=np.sqrt(null_e) / np.maximum(np.sqrt((xt ** 2).sum(1)), 1e-12),
+        recon_energy=(Pxh ** 2).sum(1),
+        true_energy=(Pxt ** 2).sum(1),
+    )
