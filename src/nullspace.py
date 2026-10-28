@@ -106,3 +106,37 @@ def subspace_metrics(subs, x_hat, x_true, tau):
         cos_sub=np.where(denom > 1e-12, inner / np.maximum(denom, 1e-12), np.nan),
         inject_ratio=np.where(true_e > 1e-12, recon_e / np.maximum(true_e, 1e-12), np.nan),
     )
+
+
+# ---------------------------------------------------------------------------------------------------------------
+# Spectral band decomposition (step 2c): where along the singular-value spectrum does the error live?
+# Bands are defined on s_i / s_max and partition ALL n directions: [0,1e-10) is the exact null space, the rest are
+# increasingly well-measured directions. (Bands are disjoint; tau-subspaces above are unions of the first bands.)
+# ---------------------------------------------------------------------------------------------------------------
+BAND_EDGES = [0.0, 1e-10, 0.05, 0.1, 0.2, 0.3, 0.5, 1.0 + 1e-9]
+
+
+def band_labels(edges=BAND_EDGES):
+    labs = []
+    for i, (lo, hi) in enumerate(zip(edges[:-1], edges[1:])):
+        labs.append("exact null" if i == 0 else (f"<{hi:g}" if i == 1 else (f">={lo:g}" if i == len(edges) - 2 else f"{lo:g}-{hi:g}")))
+    return labs
+
+
+def band_masks(subs, edges=BAND_EDGES):
+    r = subs.S / subs.smax
+    return [(r >= lo) & (r < hi) for lo, hi in zip(edges[:-1], edges[1:])]
+
+
+def band_metrics(subs, x_hat, x_true, edges=BAND_EDGES):
+    """Per-image energies in each singular-value band (arrays of shape (B, n_bands)):
+    err = ||band part of (x_hat - x)||^2, recon = ||band part of x_hat||^2, true = ||band part of x||^2,
+    inner = <band part of x_hat, band part of x>.  dims: number of directions per band.
+    Sum over bands of err equals the total error energy (V is orthogonal)."""
+    Ch, Ct = _np(x_hat) @ subs.V, _np(x_true) @ subs.V
+    masks = band_masks(subs, edges)
+    err = np.stack([((Ch[:, m] - Ct[:, m]) ** 2).sum(1) for m in masks], 1)
+    recon = np.stack([(Ch[:, m] ** 2).sum(1) for m in masks], 1)
+    true = np.stack([(Ct[:, m] ** 2).sum(1) for m in masks], 1)
+    inner = np.stack([(Ch[:, m] * Ct[:, m]).sum(1) for m in masks], 1)
+    return dict(err=err, recon=recon, true=true, inner=inner, dims=np.array([int(m.sum()) for m in masks]))

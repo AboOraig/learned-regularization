@@ -7,7 +7,7 @@ import torch
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from src.operators import RadonOperator
-from src.nullspace import OperatorSubspaces, SUBSPACES, subspace_metrics
+from src.nullspace import OperatorSubspaces, SUBSPACES, subspace_metrics, band_metrics, band_labels, BAND_EDGES
 
 
 @pytest.fixture(scope="module")
@@ -96,3 +96,24 @@ def test_cosine_and_injection_on_constructed_cases(subs):
 def test_subspaces_are_nested(subs):
     dims = [subs.dim(t) for t in sorted(SUBSPACES.values())]
     assert dims == sorted(dims)
+
+
+def test_bands_partition_all_directions(subs):
+    b = band_metrics(subs, torch.rand(2, 784), torch.rand(2, 784))
+    assert b["dims"].sum() == 784
+    assert len(band_labels()) == len(BAND_EDGES) - 1 == b["err"].shape[1]
+
+
+def test_band_errors_sum_to_total_and_match_subspaces(subs):
+    x, xh = torch.rand(6, 784).double(), torch.rand(6, 784).double()
+    b = band_metrics(subs, xh, x)
+    total = ((xh - x) ** 2).sum(1).numpy()
+    assert np.allclose(b["err"].sum(1), total, rtol=1e-9)
+    # first two bands [0,1e-10) + [1e-10,0.05) == the 'tau0.05' subspace
+    m = subspace_metrics(subs, xh, x, SUBSPACES["tau0.05"])
+    assert np.allclose(b["err"][:, :2].sum(1), m["null_err_energy"], rtol=1e-8)
+    assert np.allclose(b["recon"][:, :2].sum(1), m["recon_energy"], rtol=1e-8)
+    assert np.allclose(b["inner"][:, :2].sum(1), m["inner"], rtol=1e-8, atol=1e-12)
+    # first band == exact null space
+    m0 = subspace_metrics(subs, xh, x, SUBSPACES["exact_null"])
+    assert np.allclose(b["err"][:, 0], m0["null_err_energy"], rtol=1e-8)
