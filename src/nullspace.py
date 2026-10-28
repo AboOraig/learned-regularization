@@ -19,11 +19,11 @@ import numpy as np
 import torch
 
 # name -> relative singular-value threshold tau. Subspace = {right singular vectors with s_i < tau * s_max}.
-# "null" is the numerically exact null space; the others add weakly-determined directions.
+# "exact_null" is the numerically exact null space; the others add weakly-determined directions.
 # NOTE: for the 28x28 / 20-angle operator the spectrum has 79 singular values at ~1e-16 (exact null), then a
 # CONTINUUM from ~5e-9 to 1e-2 (relative) with no gap. A cut of 1e-10 isolates the 79 exact ones with a ~1e7 gap;
 # a cut such as 1e-8 or 1e-6 would land inside the continuum and give a different (arbitrary) dimension.
-SUBSPACES = {"null": 1e-10, "tau0.05": 0.05, "tau0.10": 0.10}
+SUBSPACES = {"exact_null": 1e-10, "tau0.05": 0.05, "tau0.10": 0.10}
 
 
 def _np(x):
@@ -60,8 +60,8 @@ class OperatorSubspaces:
         X = _np(X)
         return (X @ Vw) @ Vw.T
 
-    def gap_report(self, tau=SUBSPACES["null"]):
-        """Singular values just above/below the 'null' cut, to check the cut sits in a clear gap."""
+    def gap_report(self, tau=SUBSPACES["exact_null"]):
+        """Singular values just above/below the exact_null cut, to check the cut sits in a clear gap."""
         below = self.S[self.S < tau * self.smax]
         above = self.S[self.S >= tau * self.smax]
         return dict(n_null=len(below), largest_below=float(below.max()) if len(below) else 0.0,
@@ -72,22 +72,37 @@ def subspace_metrics(subs, x_hat, x_true, tau):
     """Per-image arrays (length B) describing what happens inside the subspace.
 
     null_err_energy : ||P (x_hat - x)||^2        error the data cannot see (prior-driven)
-    total_err_energy: ||x_hat - x||^2
+    range_err_energy: ||(I-P) (x_hat - x)||^2    error in the directions the data DO constrain
+    total_err_energy: ||x_hat - x||^2            (= null + range, orthogonal decomposition)
     null_err_frac   : null_err_energy / total_err_energy
     null_err_rel    : ||P (x_hat - x)|| / ||x||
     recon_energy    : ||P x_hat||^2              energy the method puts into the subspace
     true_energy     : ||P x||^2                  energy the true image actually has there
+    inner           : <P x_hat, P x>             (so null_err = recon + true - 2*inner, exactly)
+    cos_sub         : inner / (||P x_hat|| ||P x||)   alignment of the subspace content with the truth (NaN if undefined)
+    inject_ratio    : recon_energy / true_energy      >1: method puts MORE energy there than the truth has (NaN if true=0)
+
+    "Hallucination signature" = high inject_ratio together with low cos_sub: loud but uncorrelated content.
+    Aggregate over images with POOLED quantities (ratio of means), not means of per-image ratios.
     """
     xh, xt = _np(x_hat), _np(x_true)
     e = xh - xt
     Pe, Pxh, Pxt = subs.project(e, tau), subs.project(xh, tau), subs.project(xt, tau)
     null_e = (Pe ** 2).sum(1)
     tot_e = (e ** 2).sum(1)
+    range_e = ((e - Pe) ** 2).sum(1)
+    recon_e, true_e = (Pxh ** 2).sum(1), (Pxt ** 2).sum(1)
+    inner = (Pxh * Pxt).sum(1)
+    denom = np.sqrt(recon_e * true_e)
     return dict(
         null_err_energy=null_e,
+        range_err_energy=range_e,
         total_err_energy=tot_e,
         null_err_frac=null_e / np.maximum(tot_e, 1e-12),
         null_err_rel=np.sqrt(null_e) / np.maximum(np.sqrt((xt ** 2).sum(1)), 1e-12),
-        recon_energy=(Pxh ** 2).sum(1),
-        true_energy=(Pxt ** 2).sum(1),
+        recon_energy=recon_e,
+        true_energy=true_e,
+        inner=inner,
+        cos_sub=np.where(denom > 1e-12, inner / np.maximum(denom, 1e-12), np.nan),
+        inject_ratio=np.where(true_e > 1e-12, recon_e / np.maximum(true_e, 1e-12), np.nan),
     )
