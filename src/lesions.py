@@ -112,3 +112,16 @@ def observability(subs, e, tau):
     w = subs.project(e, tau)
     en = (e ** 2).sum(1)
     return np.where(en > 0, 1.0 - (w ** 2).sum(1) / np.where(en > 0, en, 1), np.nan)
+
+
+def arm_stats(x, xl, centers, sigma_l, contrast, rec0, recl):
+    """All lesion scores for ONE (lesion type, method/operating point). x/xl: truth without/with lesion; rec0/recl: their reconstructions
+    (all (B,784) tensors on one device). Lesions whose inserted contrast is < 50% of nominal in the truth (clipped away) are excluded."""
+    rho = lesion_rho(sigma_l); nom = nominal_response(sigma_l, contrast)
+    tt1, tt0 = contrast_at(xl, rho, centers).cpu().numpy(), contrast_at(x, rho, centers).cpu().numpy()
+    valid = (tt1 - tt0) >= 0.5 * nom
+    t1, t0 = contrast_at(recl, rho, centers).cpu().numpy(), contrast_at(rec0, rho, centers).cpu().numpy()
+    fl, _ = count_false_lesions(rec0, x, rho, 0.5 * nom)
+    return dict(pauc=paired_auc(t1[valid], t0[valid]), auc=auc(t1[valid], t0[valid]),
+                retention=float((t1 - t0)[valid].mean() / (tt1 - tt0)[valid].mean()),
+                false_per_img=float(fl.float().mean()), n_valid=int(valid.sum()))
