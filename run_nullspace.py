@@ -29,11 +29,11 @@ import matplotlib; matplotlib.use("Agg"); import matplotlib.pyplot as plt
 from scipy.stats import wilcoxon
 from src.operators import RadonOperator, add_noise
 from src.denoiser import load_denoiser
-from src.experiment import tune_all, reconstruct_all
+from src.experiment import tune_all, reconstruct_all, set_sd_grid
 from src.metrics import per_image_metrics
 from src.nullspace import OperatorSubspaces, SUBSPACES, subspace_metrics
 from src.finegrid import make_simulator
-from src.data import load_mnist
+from src.data import load_mnist, load_fashion_train
 
 p = argparse.ArgumentParser()
 p.add_argument("--exp", default="all", choices=["noise", "angles", "shift", "all"])
@@ -46,6 +46,8 @@ p.add_argument("--model", default="results/dncnn.pt")
 p.add_argument("--out", default="results")
 p.add_argument("--fine_factor", type=int, default=0, help="0 = v1 behaviour (inverse crime); odd f>=3: simulate data on an f-times finer grid")
 p.add_argument("--up_mode", default="bilinear", choices=["nearest", "bilinear", "bicubic"], help="how the 28x28 image is up-sampled for the fine grid")
+p.add_argument("--tune_set", default="mnist", choices=["mnist", "fashion"], help="validation distribution used to tune ALL methods (fashion only with --exp shift: matched-prior control)")
+p.add_argument("--sd_grid", default="", help="comma list overriding the PnP sigma_d grid (default: v1 grid)")
 p.add_argument("--suffix", default="", help="appended to all output file names, e.g. _fine5")
 p.add_argument("--sigmas", default="0,0.01,0.05,0.1,0.2", help="noise levels for --exp noise (20 angles)")
 p.add_argument("--angles", default="5,10,20,40,90", help="angle counts for --exp angles (nominal sigma)")
@@ -54,7 +56,13 @@ a = p.parse_args()
 dev = "cuda" if torch.cuda.is_available() else "cpu"
 print(f"torch {torch.__version__} | numpy {np.__version__} | python {platform.python_version()} | device {dev}")
 os.makedirs(a.out, exist_ok=True)
-_, val, test = load_mnist(); val, test = val[:a.n_val].to(dev), test[:a.n_test].to(dev)
+assert a.tune_set == "mnist" or a.exp == "shift", "--tune_set fashion is only defined for --exp shift"
+if a.sd_grid:
+    set_sd_grid([float(v) for v in a.sd_grid.split(",")])
+_, val, test = load_mnist()
+if a.tune_set == "fashion":
+    val = load_fashion_train()[1]          # held-out part of the Fashion TRAIN split (the test split is used for evaluation)
+val, test = val[:a.n_val].to(dev), test[:a.n_test].to(dev)
 den = load_denoiser(a.model, dev)
 HEADLINE = "tau0.05"     # subspace shown in the printed table and figures; the others are sensitivity checks
 rows = []

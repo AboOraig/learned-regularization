@@ -7,6 +7,13 @@ from .metrics import per_image_metrics
 LAM_TIK = np.logspace(-5, 0, 21)
 LAM_TV = np.logspace(-5, -1, 17)
 SD = [0.005, 0.01, 0.02, 0.05, 0.1, 0.15, 0.2, 0.3]
+
+
+def set_sd_grid(grid):
+    """Replace the sigma_d search grid IN PLACE (tune_all reads the module-level list at call time)."""
+    SD[:] = [float(g) for g in grid]
+
+
 CK = (0, 1, 2, 3, 5, 10, 25, 50, 100, 200, 400)
 
 
