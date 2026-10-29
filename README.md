@@ -13,9 +13,8 @@ regularization (FBP, Tikhonov, TV).
 
 - The learned prior beats TV regularization by up to **+4 dB PSNR**
   once the problem is genuinely ill-posed (noisy measurements or few
-  projection angles), but **loses to TV in the near noise-free regime**
-  (-6.4 dB), where digits' piecewise-constant structure favors TV directly.
-- PnP consistently selects very few iterations (5-25) under validation
+  projection angles), but is behind TV in the near noise-free regime; the size of that gap (1-6 dB) depends on the forward-model mismatch of the simulated data (see Stage 1 results) where digits' piecewise-constant structure favors TV directly.
+- PnP consistently selects very few iterations (5-25 for >= 10 angles and sigma <= 0.2; 100-400 for the 5-angle condition) under validation
   tuning. A convergence study shows why: PSNR peaks early then decays
   as iterations continue, while the data-fidelity residual keeps
   rising — the CNN denoiser has no convergence guarantee, so **early
@@ -104,7 +103,19 @@ python run_baselines.py --exp noise --synthetic --n_val 30 --n_test 50
 ## Limitations
 
 Small-scale (28x28) images; same forward operator used to generate
-and reconstruct data outside E3 (inverse crime); one trained denoiser
-instance; PnP has no convergence guarantee and depends on tuned early
+and reconstruct data outside E3 (inverse crime) in E1-E5 (E6-E10 use finer-grid data); three denoisers per configuration in E8-E10, one in E1-E5; PnP has no convergence guarantee and depends on tuned early
 stopping; mismatch levels tested are moderate. See [REPORT.md](REPORT.md)
 for full discussion.
+
+## Stage 1 extensions (branch stage1-hallucination-metrics)
+
+| Script | What it does | Main outputs (results/) |
+|---|---|---|
+| run_nullspace.py [--fine_factor 5 --up_mode bicubic --suffix _fine5c] | error decomposition along the SVD of A; noise / angle / shift sweeps; optional finer-grid data | nullspace_*.csv, nullspace_*.png |
+| compare_crime.py --suffix _fine5c | inverse crime vs crime-free comparison | crime_comparison.csv/.png |
+| run_spectral.py | iteration and sigma_d control, spectral bands | iteration_control*.csv, spectral_profile*.png |
+| run_step4.py + summarize_step4.py | 3 seeds x {MNIST sigma_max 0.3, MNIST sigma_max 0.5, Fashion} denoisers, matched-prior control | step4/step4_summary.csv/.png |
+| run_lesions.py + summarize_step5.py | lesion-insertion test (paired AUC, retention, false lesions) | step5/step5_summary.csv/.png, lesion_*_examples_*.png |
+| run_oppoint.py | operating-point study (PSNR vs lesion detectability) | step5b/oppoint_*.csv/.png |
+
+Tests: `python -m pytest tests -q` (34 tests).
