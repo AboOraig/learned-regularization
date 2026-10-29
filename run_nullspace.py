@@ -18,6 +18,10 @@ Outputs (results/):
   nullspace_method_means.csv  pooled means for ALL four methods
   nullspace_shift.png / nullspace_sweeps.png / nullspace_signature.png
 Empty subspaces (e.g. the exact null space at >= 40 angles) are skipped, not reported as NaN rows.
+
+Step 3 (no inverse crime):  --fine_factor 5 [--up_mode bilinear] --suffix _fine5   simulates the clean data on a 5x finer grid
+(src/finegrid.py) while all solvers still use the 28x28 operator; hyperparameters are re-tuned on data simulated the same
+way. Same seeds as the crime run, so the two runs are paired. model_err_norm = mean ||y_clean - A x||.
 """
 import argparse, os, platform
 import numpy as np, pandas as pd, torch
@@ -28,6 +32,7 @@ from src.denoiser import load_denoiser
 from src.experiment import tune_all, reconstruct_all
 from src.metrics import per_image_metrics
 from src.nullspace import OperatorSubspaces, SUBSPACES, subspace_metrics
+from src.finegrid import make_simulator
 from src.data import load_mnist
 
 p = argparse.ArgumentParser()
@@ -39,6 +44,11 @@ p.add_argument("--sigma", type=float, default=0.05, help="nominal noise for angl
 p.add_argument("--sets", default="mnist,fashion,emnist,shepp", help="comma list for --exp shift")
 p.add_argument("--model", default="results/dncnn.pt")
 p.add_argument("--out", default="results")
+p.add_argument("--fine_factor", type=int, default=0, help="0 = v1 behaviour (inverse crime); odd f>=3: simulate data on an f-times finer grid")
+p.add_argument("--up_mode", default="bilinear", choices=["nearest", "bilinear", "bicubic"], help="how the 28x28 image is up-sampled for the fine grid")
+p.add_argument("--suffix", default="", help="appended to all output file names, e.g. _fine5")
+p.add_argument("--sigmas", default="0,0.01,0.05,0.1,0.2", help="noise levels for --exp noise (20 angles)")
+p.add_argument("--angles", default="5,10,20,40,90", help="angle counts for --exp angles (nominal sigma)")
 a = p.parse_args()
 
 dev = "cuda" if torch.cuda.is_available() else "cpu"
@@ -68,20 +78,24 @@ def score(recon, x_true, subs, meta, params):
 
 
 def run_sweep(exp):
-    conds = ([dict(n_angles=20, sigma=s) for s in [0, 0.01, 0.05, 0.1, 0.2]] if exp == "noise"
-             else [dict(n_angles=n, sigma=a.sigma) for n in [5, 10, 20, 40, 90]])
+    conds = ([dict(n_angles=20, sigma=float(s)) for s in a.sigmas.split(",")] if exp == "noise"
+             else [dict(n_angles=int(n), sigma=a.sigma) for n in a.angles.split(",")])
     for c in conds:
         op = RadonOperator(28, c["n_angles"], device=dev)
-        params = tune_all(op, den, val, add_noise(op.forward(val), c["sigma"], seed=a.seed))
-        yt = add_noise(op.forward(test), c["sigma"], seed=a.seed + 1)
+        sim = make_simulator(op, a.fine_factor, a.up_mode)      # = op.forward when --fine_factor 0 (inverse crime)
+        params = tune_all(op, den, val, add_noise(sim(val), c["sigma"], seed=a.seed))
+        ct = sim(test); yt = add_noise(ct, c["sigma"], seed=a.seed + 1)
+        me = (ct - op.forward(test)).norm(dim=1).mean().item()    # model error ||y_clean - A x|| (0 with the inverse crime)
         subs = OperatorSubspaces(op.A)
-        print(f"[{exp}] {c} params={params} subspace dims={ {k: subs.dim(t) for k, t in SUBSPACES.items()} }", flush=True)
-        score(reconstruct_all(op, den, yt, params), test, subs, dict(experiment=exp, dataset="MNIST", **c), params)
+        print(f"[{exp}] {c} params={params} subspace dims={ {k: subs.dim(t) for k, t in SUBSPACES.items()} } "
+              f"| model err {me:.3f} vs noise norm {c['sigma'] * np.sqrt(op.m):.3f}", flush=True)
+        score(reconstruct_all(op, den, yt, params), test, subs, dict(experiment=exp, dataset="MNIST", model_err_norm=me, **c), params)
 
 
 def run_shift():
     op = RadonOperator(28, 20, device=dev)
-    params = tune_all(op, den, val, add_noise(op.forward(val), a.sigma, seed=a.seed))   # tuned once, then frozen
+    sim = make_simulator(op, a.fine_factor, a.up_mode)
+    params = tune_all(op, den, val, add_noise(sim(val), a.sigma, seed=a.seed))   # tuned once, then frozen
     subs = OperatorSubspaces(op.A)
     print(f"[shift] frozen params={params} subspace dims={ {k: subs.dim(t) for k, t in SUBSPACES.items()} }", flush=True)
     from src.data import load_fashion, load_emnist_letters, shepp_logan
@@ -94,16 +108,17 @@ def run_shift():
             continue
         name, getx = avail[key]
         x = getx()
-        y = add_noise(op.forward(x), a.sigma, seed=a.seed + 10 + i)
+        cx = sim(x); y = add_noise(cx, a.sigma, seed=a.seed + 10 + i)
+        me = (cx - op.forward(x)).norm(dim=1).mean().item()
         score(reconstruct_all(op, den, y, params), x, subs,
-              dict(experiment="shift", dataset=name, n_angles=20, sigma=a.sigma), params)
+              dict(experiment="shift", dataset=name, n_angles=20, sigma=a.sigma, model_err_norm=me), params)
 
 
 for e in (["noise", "angles", "shift"] if a.exp == "all" else [a.exp]):
     run_sweep(e) if e in ("noise", "angles") else run_shift()
 
 df = pd.DataFrame(rows)
-df.to_csv(f"{a.out}/nullspace_metrics.csv", index=False)
+df.to_csv(f"{a.out}/nullspace_metrics{a.suffix}.csv", index=False)
 KEYS = ["experiment", "dataset", "sigma", "n_angles", "subspace", "dim"]
 COLS = ["null_err_energy", "range_err_energy", "total_err_energy", "recon_energy", "true_energy", "inner"]
 
@@ -118,11 +133,11 @@ def wil(x, y):
 
 
 # ---- pooled means for all methods -----------------------------------------------------------------------------
-mm = df.groupby(KEYS + ["method"])[COLS + ["psnr", "ssim"]].mean().reset_index()
+mm = df.groupby(KEYS + ["method"])[COLS + ["psnr", "ssim", "model_err_norm"]].mean().reset_index()
 mm["null_share"] = mm.null_err_energy / mm.total_err_energy
 mm["inject"] = mm.recon_energy / mm.true_energy
 mm["cos_pooled"] = mm.inner / np.sqrt(mm.true_energy * mm.recon_energy)
-mm.to_csv(f"{a.out}/nullspace_method_means.csv", index=False)
+mm.to_csv(f"{a.out}/nullspace_method_means{a.suffix}.csv", index=False)
 
 # ---- summary: PnP vs TV inside each subspace ------------------------------------------------------------------
 out = []
@@ -142,6 +157,7 @@ for k, g in df.groupby(KEYS):
                     f"cos_median_{tag}": float(np.nanmedian(P["cos_sub"][m])),
                     f"psnr_{tag}": g[g.method == m].psnr.mean()})
     row["true_energy_in_subspace"] = P["true_energy"]["TV"].mean()
+    row["model_err_norm"] = g.model_err_norm.iloc[0]
     for c, nm in (("null", "null_err_energy"), ("range", "range_err_energy"), ("total", "total_err_energy")):
         row[f"{c}_err_ratio_PnP_over_TV"] = row[f"{c}_err_PnP"] / row[f"{c}_err_TV"]
         row["p_wilcoxon" if c == "null" else f"p_wilcoxon_{c}"] = wil(P[nm]["PnP-DnCNN"], P[nm]["TV"])
@@ -149,7 +165,7 @@ for k, g in df.groupby(KEYS):
     row.update(tik_lam=pp.tik_lam, tv_lam=pp.tv_lam, pnp_sd=pp.pnp_sd, pnp_k=pp.pnp_k)
     out.append(row)
 summ = pd.DataFrame(out)
-summ.to_csv(f"{a.out}/nullspace_pnp_vs_tv.csv", index=False)
+summ.to_csv(f"{a.out}/nullspace_pnp_vs_tv{a.suffix}.csv", index=False)
 
 pd.set_option("display.width", 260, "display.max_columns", 40)
 S = summ[summ.subspace == HEADLINE]
@@ -178,7 +194,7 @@ if len(sh):
             ax[j].bar(np.arange(len(ds)) + m_i * w, d["mean"], w, yerr=1.96 * d["sem"], capsize=2, color=COL[m], label=m)
         ax[j].set_xticks(np.arange(len(ds)) + 0.4 - w / 2); ax[j].set_xticklabels(ds, rotation=12, fontsize=8)
         ax[j].set_title(ttl, fontsize=10); ax[j].grid(alpha=.3, axis="y")
-    ax[0].legend(); plt.tight_layout(); plt.savefig(f"{a.out}/nullspace_shift.png", dpi=150); plt.close()
+    ax[0].legend(); plt.tight_layout(); plt.savefig(f"{a.out}/nullspace_shift{a.suffix}.png", dpi=150); plt.close()
 
     # hallucination signature: energy injected into the subspace (relative to truth) vs alignment with the truth
     M = mm[(mm.subspace == HEADLINE) & (mm.experiment == "shift")]
@@ -191,7 +207,7 @@ if len(sh):
     ax.legend(handles=[Line2D([], [], marker="o", ls="", color=c, label=m) for m, c in COL.items()] +
                       [Line2D([], [], marker=mk[d], ls="", color="gray", label=d) for d in ds], fontsize=7, loc="upper right")
     ax.set_title("Hallucination signature: loud AND misaligned = bottom right", fontsize=10)
-    plt.tight_layout(); plt.savefig(f"{a.out}/nullspace_signature.png", dpi=150); plt.close()
+    plt.tight_layout(); plt.savefig(f"{a.out}/nullspace_signature{a.suffix}.png", dpi=150); plt.close()
 
 sw = [(e, "sigma", "measurement noise sigma") if e == "noise" else (e, "n_angles", "number of angles")
       for e in ("noise", "angles") if (H.experiment == e).any()]
@@ -202,6 +218,6 @@ if sw:
             g = H[(H.experiment == e) & (H.method == m)].groupby(xc).null_err_energy.agg(["mean", "sem"])
             ax[0, j].errorbar(g.index, g["mean"], yerr=1.96 * g["sem"], marker="o", capsize=3, color=COL[m], label=m)
         ax[0, j].set_xlabel(xl); ax[0, j].set_ylabel(f"error energy in '{HEADLINE}'"); ax[0, j].grid(alpha=.3)
-    ax[0, 0].legend(); plt.tight_layout(); plt.savefig(f"{a.out}/nullspace_sweeps.png", dpi=150); plt.close()
+    ax[0, 0].legend(); plt.tight_layout(); plt.savefig(f"{a.out}/nullspace_sweeps{a.suffix}.png", dpi=150); plt.close()
 print(f"\nSaved to {a.out}/: nullspace_metrics.csv, nullspace_pnp_vs_tv.csv, nullspace_method_means.csv, "
-      "nullspace_shift.png, nullspace_sweeps.png, nullspace_signature.png")
+      "nullspace_shift.png, nullspace_sweeps.png, nullspace_signature.png (with suffix " + repr(a.suffix) + ")")

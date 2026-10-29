@@ -12,6 +12,7 @@ results/nullspace_pnp_vs_tv.csv (written by run_nullspace.py) so both analyses u
 to tune again from scratch (slow).
 
 Usage:  python run_spectral.py
+        python run_spectral.py --fine_factor 5 --suffix _fine5 --params_csv results/nullspace_pnp_vs_tv_fine5.csv   # no inverse crime
         python run_spectral.py --sets mnist,fashion          # subset
         python run_spectral.py --sds 0.05,0.2                # also run other sigma_d values (extra curves)
 Outputs (results/): spectral_bands.csv, iteration_control.csv, spectral_profile.png, iteration_control.png
@@ -30,6 +31,7 @@ from src.pnp import pnp_pgd
 from src.metrics import per_image_metrics
 from src.nullspace import OperatorSubspaces, SUBSPACES, subspace_metrics, band_metrics, band_labels, BAND_EDGES
 from src.data import load_mnist
+from src.finegrid import make_simulator
 
 p = argparse.ArgumentParser()
 p.add_argument("--n_val", type=int, default=100)
@@ -43,6 +45,9 @@ p.add_argument("--model", default="results/dncnn.pt")
 p.add_argument("--params_csv", default="results/nullspace_pnp_vs_tv.csv")
 p.add_argument("--retune", action="store_true")
 p.add_argument("--out", default="results")
+p.add_argument("--fine_factor", type=int, default=0, help="0 = inverse crime (v1); odd f>=3: data simulated on an f-times finer grid")
+p.add_argument("--up_mode", default="bilinear", choices=["nearest", "bilinear", "bicubic"])
+p.add_argument("--suffix", default="", help="appended to output file names, e.g. _fine5")
 a = p.parse_args()
 
 dev = "cuda" if torch.cuda.is_available() else "cpu"
@@ -52,6 +57,7 @@ _, val, test = load_mnist(); val, test = val[:a.n_val].to(dev), test[:a.n_test].
 den = load_denoiser(a.model, dev)
 op = RadonOperator(28, 20, device=dev)
 subs = OperatorSubspaces(op.A)
+sim = make_simulator(op, a.fine_factor, a.up_mode)
 eta = 1.0 / op.lipschitz()
 TAU = SUBSPACES["tau0.05"]
 labels = band_labels()
@@ -66,7 +72,7 @@ def frozen_params():
             print(f"frozen params read from {a.params_csv}")
             return {"Tikhonov": float(r.tik_lam), "TV": float(r.tv_lam), "PnP": (float(r.pnp_sd), int(r.pnp_k))}
         print(f"no matching shift row in {a.params_csv} -> tuning")
-    return tune_all(op, den, val, add_noise(op.forward(val), a.sigma, seed=a.seed))
+    return tune_all(op, den, val, add_noise(sim(val), a.sigma, seed=a.seed))
 
 
 params = frozen_params()
@@ -112,7 +118,7 @@ for i, key in enumerate(avail):                  # i fixed by position => same n
         continue
     ds, getx = avail[key]
     x = getx()
-    y = add_noise(op.forward(x), a.sigma, seed=a.seed + 10 + i)
+    y = add_noise(sim(x), a.sigma, seed=a.seed + 10 + i)
     record(ds, "FBP", np.nan, np.nan, op.fbp(y), x, y)
     record(ds, "Tikhonov", np.nan, np.nan, Tikhonov(op)(y, params["Tikhonov"]), x, y)
     record(ds, "TV", np.nan, np.nan, TVADMM(op)(y, params["TV"]), x, y)
@@ -123,8 +129,8 @@ for i, key in enumerate(avail):                  # i fixed by position => same n
     print(f"done {ds}", flush=True)
 
 S, B = pd.DataFrame(sum_rows), pd.DataFrame(band_rows)
-S.to_csv(f"{a.out}/iteration_control.csv", index=False)
-B.to_csv(f"{a.out}/spectral_bands.csv", index=False)
+S.to_csv(f"{a.out}/iteration_control{a.suffix}.csv", index=False)
+B.to_csv(f"{a.out}/spectral_bands{a.suffix}.csv", index=False)
 dsets = list(S.dataset.unique())
 
 # ---- printed summary ---------------------------------------------------------------------------------------------
@@ -166,7 +172,7 @@ for ax, ds in zip(axs[0], dsets):
     ax.set_xticks(xs); ax.set_xticklabels([f"{l}\n({d})" for l, d in zip(labs, dims)], fontsize=7)
     ax.set_xlabel("band of s/s_max  (#directions)", fontsize=8)
 axs[0, 0].set_ylabel("error energy in band (log)"); axs[0, 0].legend(fontsize=7)
-plt.tight_layout(); plt.savefig(f"{a.out}/spectral_profile.png", dpi=150); plt.close()
+plt.tight_layout(); plt.savefig(f"{a.out}/spectral_profile{a.suffix}.png", dpi=150); plt.close()
 
 # ---- figure 2: iteration-budget control --------------------------------------------------------------------------
 cols = plt.cm.tab10(np.arange(len(dsets)))
@@ -186,5 +192,5 @@ for ax, (col, ttl, logy) in zip(axs, panels):
     if logy: ax.set_yscale("log")
 axs[0].legend(fontsize=7)
 fig.text(0.5, -0.02, "dashed = TV (same colour = same dataset); ring = MNIST-tuned k", ha="center", fontsize=8)
-plt.tight_layout(); plt.savefig(f"{a.out}/iteration_control.png", dpi=150, bbox_inches="tight"); plt.close()
-print(f"\nSaved to {a.out}/: iteration_control.csv, spectral_bands.csv, spectral_profile.png, iteration_control.png")
+plt.tight_layout(); plt.savefig(f"{a.out}/iteration_control{a.suffix}.png", dpi=150, bbox_inches="tight"); plt.close()
+print(f"\nSaved to {a.out}/: iteration_control{a.suffix}.csv, spectral_bands{a.suffix}.csv, spectral_profile{a.suffix}.png, iteration_control{a.suffix}.png")
