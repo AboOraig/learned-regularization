@@ -78,29 +78,7 @@ PnP-DnCNN. FBP and Tikhonov retain visible noise; TV looks blocky;
 PnP-DnCNN is visually closest to the ground truth. Error is
 concentrated on stroke edges, not flat regions.
 
-## 3. Why so few PnP iterations? (E5 ablation)
-
-Validation tuning consistently selects very few PnP iterations
-(5-25 for >= 10 angles and sigma <= 0.2; 100-400 for the 5-angle condition).
- The convergence study (`fig_convergence.png`, 50 test images, sigma_d in {0.02, 0.05, 0.1, 0.2},
-400 iterations) shows why: PSNR rises quickly, **peaks around iteration
-5-15, and then decays to a lower plateau** (e.g. sigma_d=0.1: peak
-~24.0 dB near iteration ~10, plateau ~22.0 dB by iteration 400).
-Simultaneously the data-fidelity residual ||A x_k - y|| does *not*
-decrease with iteration; it rises and plateaus, more so for larger
-sigma_d.
-
-**Finding 2.** This PnP-PGD scheme does not converge to a fixed point
-that is both data-consistent and maximally accurate. The CNN denoiser
-has no non-expansiveness guarantee, so continued iteration trades data
-fidelity for an increasingly strong (and increasingly biased) prior
-pull. Early stopping is therefore not a tuning artifact but a
-necessary, active part of the regularization; this is consistent with
-know limitations of PnP methods using unconstrained deep denoisers
-(Ryu et al. 2019 and related PnP-convergence literature discuss this
-trade-off explicitly).
-
-## 4. Forward-model mismatch (E3)
+## 3. Forward-model mismatch (E3)
 
 Data are generated with the true 20-angle operator; reconstruction
 uses a wrong operator with either a constant angle offset (rigid
@@ -131,7 +109,7 @@ edges, which are penalized more by geometric misregistration than a
 smoother TV reconstruction; this is a hypothesis, not something
 independently verified here.
 
-## 5. Distribution shift (E4)
+## 4. Distribution shift (E4)
 
 The denoiser is trained only on MNIST digits. At test time the same
 frozen pipeline (sigma=0.05, 20 angles) is applied to Fashion-MNIST,
@@ -163,6 +141,28 @@ graceful degradation, since the output can look confidently
 structured while being wrong. This is the central limitation of the
 project and the main argument for out-of-distribution testing of any
 learned prior before deployment.
+
+## 5. Why so few PnP iterations? (E5 ablation)
+
+Validation tuning consistently selects very few PnP iterations
+(5-25 for >= 10 angles and sigma <= 0.2; 100-400 for the 5-angle condition).
+ The convergence study (`fig_convergence.png`, 50 test images, sigma_d in {0.02, 0.05, 0.1, 0.2},
+400 iterations) shows why: PSNR rises quickly, **peaks around iteration
+5-15, and then decays to a lower plateau** (e.g. sigma_d=0.1: peak
+~24.0 dB near iteration ~10, plateau ~22.0 dB by iteration 400).
+Simultaneously the data-fidelity residual ||A x_k - y|| does *not*
+decrease with iteration; it rises and plateaus, more so for larger
+sigma_d.
+
+**Finding 2.** This PnP-PGD scheme does not converge to a fixed point
+that is both data-consistent and maximally accurate. The CNN denoiser
+has no non-expansiveness guarantee, so continued iteration trades data
+fidelity for an increasingly strong (and increasingly biased) prior
+pull. Early stopping is therefore not a tuning artifact but a
+necessary, active part of the regularization; this is consistent with
+know limitations of PnP methods using unconstrained deep denoisers
+(Ryu et al. 2019 and related PnP-convergence literature discuss this
+trade-off explicitly).
 
 ## 6. Inverse crime (E6)
 Measurements are also simulated on a 5x finer grid (nearest / bicubic / bilinear object). For sigma >= 0.05 the
