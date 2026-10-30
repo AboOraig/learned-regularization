@@ -1,7 +1,8 @@
-"""Train the DnCNN prior on MNIST. Usage: python train_denoiser.py --epochs 8"""
+"""Train the DnCNN prior. Usage: python train_denoiser.py --epochs 8 [--data mnist|fashion] [--seed 0] [--sigma_max 0.3] [--out ...]
+Defaults reproduce v1 (MNIST, seed 0, sigma_max 0.3)."""
 import argparse, os, time, torch, torch.nn.functional as F
 from src.denoiser import DnCNN
-from src.data import load_mnist
+from src.data import load_mnist, load_fashion_train
 
 p = argparse.ArgumentParser()
 p.add_argument("--epochs", type=int, default=8)
@@ -11,12 +12,17 @@ p.add_argument("--sigma_max", type=float, default=0.3)
 p.add_argument("--depth", type=int, default=8)
 p.add_argument("--ch", type=int, default=64)
 p.add_argument("--out", default="results/dncnn.pt")
+p.add_argument("--data", default="mnist", choices=["mnist", "fashion"], help="training distribution of the prior")
+p.add_argument("--seed", type=int, default=0, help="init / data order / noise seed")
+p.add_argument("--max_train", type=int, default=0, help="debug only: use the first N training images")
 a = p.parse_args()
 
-torch.manual_seed(0)
+torch.manual_seed(a.seed)
 dev = "cuda" if torch.cuda.is_available() else "cpu"
-os.makedirs("results", exist_ok=True)
-train, val, _ = load_mnist()
+os.makedirs(os.path.dirname(a.out) or ".", exist_ok=True)
+train, val = (load_mnist()[:2] if a.data == "mnist" else load_fashion_train())
+if a.max_train:
+    train = train[:a.max_train]
 train, val = train.reshape(-1, 1, 28, 28).to(dev), val[:200].reshape(-1, 1, 28, 28).to(dev)
 model = DnCNN(a.depth, a.ch).to(dev)
 opt = torch.optim.Adam(model.parameters(), lr=a.lr)

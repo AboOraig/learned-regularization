@@ -8,15 +8,25 @@ def _to_flat(t):
     return (t.float() / 255.0).reshape(len(t), -1)
 
 
+def split_train_val(x, n_val=500, seed=0):
+    """Deterministic held-out validation split (same recipe for every dataset). Returns (train, val)."""
+    g = torch.Generator().manual_seed(seed)
+    perm = torch.randperm(len(x), generator=g)
+    return x[perm[n_val:]], x[perm[:n_val]]
+
+
 def load_mnist(root="data", n_val=500, seed=0):
     from torchvision import datasets
     tr = datasets.MNIST(root, train=True, download=True)
     te = datasets.MNIST(root, train=False, download=True)
-    x = _to_flat(tr.data)
-    g = torch.Generator().manual_seed(seed)
-    perm = torch.randperm(len(x), generator=g)
-    val, train = x[perm[:n_val]], x[perm[n_val:]]
+    train, val = split_train_val(_to_flat(tr.data), n_val, seed)
     return train, val, _to_flat(te.data)
+
+
+def load_fashion_train(root="data", n_val=500, seed=0):
+    """Fashion-MNIST TRAIN split -> (train, val); the test split (load_fashion) stays untouched for evaluation."""
+    from torchvision import datasets
+    return split_train_val(_to_flat(datasets.FashionMNIST(root, train=True, download=True).data), n_val, seed)
 
 
 def load_fashion(root="data"):

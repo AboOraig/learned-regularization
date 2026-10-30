@@ -1,0 +1,881 @@
+\documentclass[11pt]{article}
+
+\usepackage[margin=1in]{geometry}
+\usepackage{amsmath,amssymb}
+\usepackage{graphicx}
+\usepackage{booktabs}
+\usepackage[colorlinks=true,linkcolor=blue!50!black,citecolor=blue!50!black,urlcolor=blue!50!black]{hyperref}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage{xcolor}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{caption}
+\usepackage{subcaption}
+
+\title{\LARGE\textbf{Learned Regularization for Robust Image Reconstruction:}\\[4pt]
+\large\textbf{A Comparative Study of Plug-and-Play Priors under Noise,\\
+Undersampling, Model Mismatch, and Distribution Shift}}
+\author{Mohammed Abo Oraig \\ \small Independent research; University of Toulon \\ \small \texttt{mohammed-abo-oraig@etud.univ-tln.fr}}
+\date{}
+
+
+%\date{\today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+We study sparse-view computed tomography as a linear inverse problem and compare classical
+variational regularization against a learned image prior used inside a Plug-and-Play
+proximal-gradient (PnP-PGD) scheme, benchmarking it against filtered back-projection, Tikhonov and
+total-variation (TV) regularization. We use disjoint train/validation/test splits, per-condition
+hyperparameter tuning, paired statistical tests, measurements simulated on a finer grid to avoid the
+inverse crime, and three independently trained denoisers per configuration. The learned prior improves
+PSNR by up to 4\,dB over TV at moderate-to-high noise ($\sigma\ge0.05$) and for 5--90 projection angles;
+in the near noise-free regime TV remains ahead, by an amount (1--6\,dB) that depends on the forward-model
+mismatch of the simulated data. Reconstruction quality peaks after a handful of iterations and then
+degrades while the data residual rises. The advantage narrows under forward-model mismatch and reverses
+under distribution shift: a prior trained on MNIST loses to TV by 3--4\,dB on Fashion-MNIST and on a
+Shepp--Logan phantom, whereas a prior trained on Fashion-MNIST beats TV on Fashion-MNIST by 2.2\,dB, so
+the failure is one of prior mismatch rather than of the PnP scheme itself. An error decomposition along
+the singular vectors of the forward operator shows that, under mismatch, the reconstruction places up to
+three times the true energy in the weakly determined subspace. Finally, lesion-insertion experiments show
+that even in distribution the PSNR-tuned PnP reconstruction detects small inserted lesions less reliably
+than TV (paired AUC $0.69$ vs.\ $0.91$ for a $0.75$\,px lesion), attenuating them rather than inventing
+structure, whereas under prior mismatch it creates lesion-like blobs up to an order of magnitude more often
+than TV. Re-tuning towards lesion fidelity recovers TV-level detection only at the price of its PSNR advantage
+or of false structure. We argue that task-based and robustness evaluation should be standard components of
+learned-prior reconstruction studies.
+\end{abstract}
+
+
+\section{Introduction}
+\label{sec:intro}
+
+Image reconstruction from indirect, noisy, and incomplete measurements
+is a classical ill-posed inverse problem, arising in computed
+tomography (CT), magnetic resonance imaging, and many other imaging
+modalities. Given a forward operator $A$ and noisy measurements
+\begin{equation}
+y = Ax + n,
+\end{equation}
+the goal is to recover $x$ from $y$ when $A$ is ill-conditioned or
+rank-deficient, as is the case for sparse-view CT with few projection
+angles. Classical approaches address ill-posedness through explicit
+regularization, solving
+\begin{equation}
+\hat{x} = \arg\min_x \; \tfrac{1}{2}\lVert Ax - y \rVert_2^2 + \lambda R(x),
+\end{equation}
+with $R$ a hand-crafted prior such as Tikhonov (L2) or total variation
+(TV) penalties. In recent years, learned image priors -- most notably
+through Plug-and-Play (PnP) methods and deep unrolling -- have been
+proposed to replace or augment hand-crafted regularizers with a
+denoising neural network, exploiting the empirical observation that
+image denoisers implicitly encode rich natural-image statistics
+\citep{venkatakrishnan2013plugandplay}.
+
+While learned priors frequently outperform classical regularization on
+in-distribution benchmarks, a growing body of work has raised concerns
+about their \emph{robustness}: sensitivity to distribution shift, lack
+of convergence guarantees, and instabilities under small perturbations
+of the input or forward model \citep{antun2020instabilities}. Many
+project-level or introductory studies of learned reconstruction report
+only in-distribution accuracy, leaving these robustness questions
+unaddressed.
+
+This paper documents a controlled, small-scale study designed
+explicitly to probe these questions. We deliberately restrict scope
+to a simple, cheaply reproducible setting -- sparse-view tomography of
+$28\times28$ MNIST-derived images -- in order to run a thorough grid
+of experiments with proper train/validation/test protocol rather than
+a single headline comparison. Our contributions are:
+
+\begin{itemize}
+\item A from-scratch implementation of a sparse-view Radon operator
+with exact adjoint, classical regularization baselines (FBP, Tikhonov,
+TV-ADMM), and a PnP-PGD solver using a noise-conditioned DnCNN prior.
+\item A systematic comparison of PSNR/SSIM accuracy across measurement
+noise levels and numbers of projection angles, with validation-tuned
+hyperparameters and paired significance testing.
+\item A convergence analysis explaining why PnP-PGD selects very few
+iterations under validation tuning, showing a peak-then-decay pattern
+in reconstruction accuracy that is not visible from residual curves
+alone.
+\item Robustness studies -- forward-model mismatch (angle offset
+and jitter) and train-test distribution shift (Fashion-MNIST, EMNIST,
+and a CT phantom) -- run with hyperparameters frozen at their nominal
+values, exposing failure modes not visible under in-distribution
+evaluation alone.
+\item Data simulated on a finer grid than the reconstruction grid, to remove the inverse crime, with a sensitivity analysis over how the finer-grid object is constructed (Section~\ref{sec:crime-results}).
+\item An error decomposition along the singular vectors of the forward operator, separating the weakly determined subspace from its orthogonal complement, with an ``injection'' and an ``alignment'' statistic that quantify prior-driven content (Section~\ref{sec:nullspace-results}).
+\item Controls for the learned prior itself: three denoiser seeds, a wider training noise range, and a  matched-prior control trained on the shifted distribution (Section~\ref{sec:seeds-results}).
+\item A task-based evaluation by lesion insertion, with an operating-point study asking whether the detectability loss can be removed by re-tuning (Sections~\ref{sec:lesion-results} and \ref{sec:oppoint-results}).
+\end{itemize}
+
+\section{Related Work}
+\label{sec:related}
+
+\paragraph{Variational regularization.} Tikhonov regularization and
+total variation \citep{rudin1992tv} remain standard baselines for
+ill-posed inverse problems due to their convexity, well-understood
+convergence properties, and interpretability. TV in particular is a
+strong prior for piecewise-constant images, which makes it a
+competitive baseline for digit-like data such as MNIST.
+
+\paragraph{Plug-and-Play priors.}
+\citet{venkatakrishnan2013plugandplay} introduced the idea of
+replacing the proximal operator of a variational regularizer with an
+off-the-shelf denoiser inside an ADMM or proximal-gradient iteration.
+Subsequent work analyzed convergence conditions for PnP under
+assumptions on the denoiser (e.g. non-expansiveness or bounded
+Lipschitz constant) \citep{chan2016pnp,ryu2019pnp}; without such
+constraints, plain CNN denoisers offer no convergence guarantee, a
+point directly relevant to the convergence behavior we observe in
+Section~\ref{sec:experiments}.
+
+\paragraph{Learned denoisers.} DnCNN \citep{zhang2017dncnn}
+demonstrated that residual CNNs trained for Gaussian denoising across
+a range of noise levels generalize well as plug-in priors. We adopt
+this noise-conditioning strategy so that a single trained network can
+serve across the PnP iteration trajectory, where the effective
+denoising strength is a tunable hyperparameter.
+
+\paragraph{Instabilities and robustness.} \citet{antun2020instabilities}
+showed that learned reconstruction methods for CT and MRI can be
+unstable to small perturbations and structural changes not present in
+training data, in some cases more so than classical methods. Related
+work on distribution shift in learned inverse problem solvers
+\citep{darestani2021shift} similarly finds that accuracy gains from
+learned priors can shrink or reverse under shift. Our distribution
+shift and forward-model mismatch experiments are a small-scale,
+project-level instantiation of this broader concern, and our findings
+(Section~\ref{sec:discussion}) are consistent with it.
+
+\paragraph{Hallucinations, the inverse crime and task-based assessment.}
+Bhadra et al.~\cite{bhadra2021} define a hallucination in tomographic reconstruction as image content
+that is not determined by the measurement data, i.e.\ content that lives in the null space of the
+imaging operator and is supplied by the prior; we adopt this view and extend it to the weakly determined
+subspace of a finite-precision operator (Section~\ref{sec:subspace}). Generating data with the same discrete
+model that is later inverted is known as the inverse crime~\cite{wirgin2004,kaipio2005} and tends to
+overstate the accuracy of methods that exploit the exact model; we remove it in Section~\ref{sec:crimefree}.
+Finally, we follow the task-based view of image quality~\cite{barrett2004}: fidelity metrics such as PSNR
+need not predict whether a clinically relevant feature survives reconstruction, so we also measure
+detection of inserted lesions.
+
+
+
+
+\section{Methodology}
+\label{sec:method}
+
+\subsection{Forward operator}
+We construct a sparse-view Radon transform $A \in \mathbb{R}^{m\times n}$
+as an explicit dense matrix by applying the discrete Radon transform to
+each canonical basis image and stacking the resulting sinogram columns.
+This gives an exact adjoint $A^\top$ (rather than an approximate one,
+as is common with implicit/fast Radon implementations), which is
+important for the PnP gradient step, and allows the reconstruction
+operator to be perturbed independently of the data-generating operator
+for the mismatch experiments in Section~\ref{sec:experiments}.
+Images are $28\times28$; the number of projection angles and, where
+relevant, an angular offset or per-angle jitter are configurable.
+
+\subsection{Classical baselines}
+\textbf{Filtered back-projection (FBP)} applies the standard ramp
+filter and inverse Radon transform. \textbf{Tikhonov regularization}
+solves
+\begin{equation}
+\hat{x} = \arg\min_x \tfrac{1}{2}\lVert Ax-y\rVert_2^2 + \tfrac{\lambda}{2}\lVert x\rVert_2^2
+= (A^\top A + \lambda I)^{-1} A^\top y,
+\end{equation}
+computed in closed form. \textbf{Total variation} solves
+\begin{equation}
+\hat{x} = \arg\min_x \tfrac{1}{2}\lVert Ax - y\rVert_2^2 + \lambda \, \mathrm{TV}(x)
+\end{equation}
+via ADMM with an isotropic TV penalty and a finite-difference operator
+$D$, splitting $z = Dx$ and applying the standard shrinkage update on
+the split variable.
+
+\subsection{Learned prior: PnP proximal gradient}
+We train a DnCNN denoiser $D_\sigma$ conditioned on the noise level
+$\sigma$ (following the FFDNet-style noise-map input), on clean MNIST
+digits corrupted with Gaussian noise $\sigma \sim \mathcal{U}(0,\sigma_{\max})$,
+$\sigma_{\max}=0.3$, using residual learning and an $\ell_2$ loss.
+A single trained network is then used across all PnP experiments,
+with $\sigma_d$ (the denoising strength argument passed at inference)
+treated as a tunable hyperparameter distinct from the training
+distribution's noise range.
+
+Reconstruction proceeds by proximal-gradient iteration, replacing the
+proximal operator of an explicit regularizer with the learned
+denoiser:
+\begin{equation}
+x_{k+1} = D_{\sigma_d}\big(x_k - \eta \, A^\top(Ax_k - y)\big), \qquad
+\eta = 1/L(A^\top A),
+\end{equation}
+where $L(A^\top A)$ is the largest eigenvalue of $A^\top A$, estimated
+by power iteration. The iteration is initialized at the FBP
+reconstruction. Algorithm~\ref{alg:pnp} summarizes the procedure.
+
+\begin{algorithm}[htbp]
+\caption{PnP proximal gradient (PnP-PGD)}
+\label{alg:pnp}
+\begin{algorithmic}[1]
+\Require measurements $y$, operator $A$, denoiser $D$, strength $\sigma_d$, step $\eta$, iterations $K$
+\State $x_0 \gets \text{FBP}(y)$
+\For{$k = 0, \dots, K-1$}
+  \State $g_k \gets A^\top(Ax_k - y)$
+  \State $x_{k+1} \gets D_{\sigma_d}(x_k - \eta \, g_k)$
+\EndFor
+\State \Return $x_K$
+\end{algorithmic}
+\end{algorithm}
+
+\subsection{Evaluation protocol}
+Data are split into disjoint training, validation, and test subsets.
+All hyperparameters -- $\lambda$ for Tikhonov and TV, and
+$(\sigma_d, K)$ for PnP -- are selected by grid search maximizing mean
+validation PSNR, independently for each experimental condition
+(noise level or number of angles) in Experiments~1--2, and then
+evaluated once on the disjoint test set. For the robustness
+experiments (Section~\ref{sec:experiments}, E3--E4), hyperparameters
+are tuned once at a single nominal condition and then \emph{frozen}
+across all mismatch/shift conditions, reflecting a realistic
+deployment scenario where a reconstruction pipeline is not retuned
+for every possible operating condition. We report PSNR and SSIM as
+mean with 95\% confidence intervals over test images, and use a
+paired Wilcoxon signed-rank test (matched test images and noise
+realizations) to assess the significance of PnP vs.\ TV differences.
+
+
+\subsection{Data simulated on a finer grid}\label{sec:crimefree}
+In E1--E5 the data are generated with the matrix $A$ used for reconstruction (an ``inverse
+crime''~\cite{wirgin2004,kaipio2005}). For the experiments of Sections~\ref{sec:crime-results}--\ref{sec:oppoint-results}
+we instead simulate measurements on a finer grid. The $28\times28$ image $x$ is upsampled by an odd integer
+factor $f=5$ (to $140\times140$) with bicubic interpolation and clipped to $[0,1]$, projected with the same
+discrete Radon transform at the same angles, and every $f$ adjacent detector bins are summed onto the 40-bin
+detector of the reconstruction operator, giving $y=\mathcal{S}(x)+n$ with $\mathcal{S}\neq A$. Reconstructions use
+$A$, and all metrics use the original $28\times28$ image as ground truth. The model error
+$\|\mathcal{S}(x)-Ax\|_2$ averages $0.09$ at 20 angles ($0.05$ at 5 and $0.17$ at 90 angles), i.e.\ 6\% of the
+noise norm $\sigma\sqrt{m}$, $m=40\,n_{\rm angles}$, at $\sigma=0.05$ and 31\% at $\sigma=0.01$. Because bicubic
+upsampling smooths the object, we also report a nearest-neighbour variant (object unchanged, model error $0.03$) and
+a bilinear variant (model error $\approx0.10$, a stronger smoothing) as a sensitivity band. All hyperparameters are
+re-tuned on validation data simulated in the same way.
+ 
+\subsection{Weakly determined subspaces and prior-driven content}\label{sec:subspace}
+Let $A=U\Sigma V^{\top}$ be the SVD of the dense operator, with singular values $s_1\ge\dots\ge s_n$. For a
+threshold $\tau$ let $W_\tau=\mathrm{span}\{v_i : s_i<\tau s_1\}$ and let $P_\tau$ be the orthogonal projector onto
+$W_\tau$. For 20 angles the operator has an exact null space of dimension 79 (singular values at machine precision),
+followed by a continuum of very small singular values with no gap; we therefore use $\tau=0.05$ as the headline
+choice, giving $\dim W_{0.05}=319$ of the 784 dimensions (and report $\tau=0.10$ and the exact null space as
+sensitivity checks). A gradient step $x\mapsto x-\eta A^\top(Ax-y)$ never changes the component of $x$ in the null
+space of $A$, so null-space content of a PnP reconstruction is supplied by the denoiser alone. For a reconstruction
+$\hat x$ and ground truth $x$ we report
+\begin{align}
+\|\hat x-x\|_2^2 &= \|P_\tau(\hat x-x)\|_2^2+\|(I-P_\tau)(\hat x-x)\|_2^2 \quad\text{(orthogonal split)},\\
+\iota &= \frac{\sum\|P_\tau\hat x\|_2^2}{\sum\|P_\tau x\|_2^2}\quad\text{(injection)},\\
+c &= \frac{\sum\langle P_\tau\hat x,P_\tau x\rangle}{\sqrt{\sum\|P_\tau\hat x\|_2^2\,\sum\|P_\tau x\|_2^2}}\quad\text{(alignment)},
+\end{align}
+with sums over test images (pooled ratios). $\iota>1$ means that the reconstruction places more energy in
+$W_\tau$ than the true images contain there; $c$ measures how much of that content points in the right direction.
+These statistics cannot by themselves distinguish prior-driven structure from amplified noise, so we interpret them
+only in comparisons with identical noise, data and solver settings.
+ 
+\subsection{Denoiser seeds, noise range and matched-prior control}\label{sec:seeds}
+Besides the single MNIST denoiser of Section~3.3 we train, with the same architecture and
+optimiser (8 epochs, Adam, cosine schedule): (i) three MNIST denoisers with $\sigma_{\max}=0.3$ (seeds 0--2);
+(ii) three MNIST denoisers with $\sigma_{\max}=0.5$, which allows $\sigma_d$ up to $0.5$ and removes the grid-edge
+tuning at $\sigma=0.2$ observed in E1; (iii) three denoisers trained on the Fashion-MNIST training split
+($\sigma_{\max}=0.3$). In the matched-prior control, all methods (Tikhonov, TV, PnP) are tuned on held-out
+Fashion-MNIST training images and tested on the Fashion-MNIST test split. The $\sigma_d$ grid is extended to
+$\{0.005,\dots,0.3,0.4,0.5\}$ for all denoisers.
+ 
+\subsection{Lesion-insertion protocol}\label{sec:lesion}
+A lesion is an additive Gaussian blob, $x_{\rm les}=\mathrm{clip}_{[0,1]}\bigl(x+c\,e^{-\|p-p_0\|^2/(2\sigma_l^2)}\bigr)$,
+inserted at a random integer location $p_0$ of the central $16\times16$ region of a test image, with
+$\sigma_l\in\{0.5,0.75,1.25,2.0\}$\,px and contrast $c\in\{0.25,0.5\}$ (eight lesion types). We reconstruct the
+lesion-present image and the lesion-absent original with independent noise realizations ($\sigma=0.05$, 20 angles,
+crime-free data), using the same locations for every method. A lesion is \emph{valid} if its inserted contrast in the
+ground truth is at least 50\% of nominal (a lesion placed on a saturated stroke is clipped away); invalid cases are
+excluded for all methods, leaving 157--197 of 200 images per type. The observer is a location-known
+statistic, the \emph{local contrast}: the mean of the image in a disc of radius $\rho=\lceil1.5\sigma_l\rceil$ minus its
+mean in the surrounding annulus of width 3 px. We report
+\begin{itemize}
+\item the \emph{paired AUC}: the fraction of images for which the statistic is larger in the lesion-present than in the
+      lesion-absent reconstruction of the same base image (the background cancels; ties count one half);
+\item the \emph{retention} $R=\mathrm{E}[t(\hat x_{\rm present})-t(\hat x_{\rm absent})]/\mathrm{E}[t(x_{\rm les})-t(x)]$,
+      which is $1$ if the lesion contrast is preserved and below 1 if it is attenuated;
+\item the number of \emph{false lesions} per lesion-absent image: local maxima of the contrast map of the
+      reconstruction whose response is at least $\theta$, half the response of the nominal lesion, and for which the
+      ground truth has no contrast above $\theta/2$ within 2\,px;
+\item the lesion's \emph{observability}, the fraction of its energy outside $W_{0.05}$.
+\end{itemize}
+For the operating-point study (Section~\ref{sec:oppoint-results}) we sweep 45 PnP settings ($\sigma_d\in\{0.02,0.05,0.1,0.15,0.2\}$,
+$K\in\{1,2,3,5,10,25,50,100,200\}$) and 9 values of the TV weight, choose operating points on 200 held-out
+\emph{in-distribution} validation images (disjoint from the images used for PSNR tuning) and report them on the
+test sets, so that the choice is neither made on the evaluation images nor informed by the shifted distribution.
+
+
+
+
+
+\section{Experiments}
+\label{sec:experiments}
+
+\subsection{E1--E2: In-distribution accuracy under noise and undersampling}
+Table~\ref{tab:e1e2} reports test-set PSNR for representative
+conditions (20 projection angles, varying measurement noise
+$\sigma$; and fixed $\sigma=0.05$, varying number of angles).
+
+\begin{table}[htbp]
+\centering
+\caption{Test PSNR (dB) under varying noise and angular undersampling.
+Best method per row in bold. PnP--TV column reports the paired
+Wilcoxon test outcome. Data generated with the reconstruction operator itself (``inverse crime''); see Table~\ref{tab:crime}
+and Table~\ref{tab:table1fine} for data simulated on a finer grid.}
+\label{tab:e1e2}
+\begin{tabular}{lccccc}
+\toprule
+Condition & FBP & Tikhonov & TV & PnP-DnCNN & PnP $-$ TV \\
+\midrule
+$\sigma{=}0$, 20 angles     & 24.2 & 28.9 & \textbf{36.0} & 29.6 & $-6.4$ ($p<10^{-30}$) \\
+$\sigma{=}0.01$, 20 angles  & 23.1 & 24.1 & 29.0 & 29.1 & $+0.07$ (n.s., $p=0.27$) \\
+$\sigma{=}0.05$, 20 angles  & 15.5 & 17.1 & 20.2 & \textbf{24.0} & $+3.85$ ($p<10^{-30}$) \\
+$\sigma{=}0.1$, 20 angles   & 10.4 & 14.7 & 16.9 & \textbf{19.9} & $+3.0$ ($p<10^{-30}$) \\
+$\sigma{=}0.2$, 20 angles   & 6.6  & 12.9 & 14.3 & \textbf{15.3} & $+1.0$ ($p<10^{-10}$) \\
+\midrule
+5 angles, $\sigma{=}0.05$  & 9.1  & 14.2 & 15.5 & \textbf{17.7} & $+2.15$ ($p<10^{-25}$) \\
+10 angles, $\sigma{=}0.05$ & 12.1 & 15.9 & 18.4 & \textbf{21.4} & $+3.05$ ($p<10^{-30}$) \\
+90 angles, $\sigma{=}0.05$ & 20.6 & 20.0 & 24.1 & \textbf{27.1} & $+3.04$ ($p<10^{-30}$) \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.95\textwidth]{figures/comparison_noise.png}
+\caption{Reconstruction accuracy (PSNR, left; SSIM, right) vs.\
+measurement noise level $\sigma$, for all four methods at a fixed
+20 projection angles. TV is the strongest method at $\sigma \le 0.01$;
+PnP-DnCNN overtakes all classical baselines for $\sigma \ge 0.05$.
+Error bars denote 95\% confidence intervals over 200 test images.}
+\label{fig:comparison_noise}
+\end{figure}
+
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.95\textwidth]{figures/comparison_angles.png}
+\caption{Reconstruction accuracy (PSNR, left; SSIM, right) vs.\
+number of projection angles, for all four methods at a fixed
+measurement noise $\sigma=0.05$. PnP-DnCNN is the top performer across the full range tested (5 to 90 angles); its advantage over TV is largest at 20--40 angles ($\approx+3.9$\,dB) and smaller at the extremes ($+2.2$\,dB at 5 angles, $+3.0$\,dB at 90 angles). Error bars denote 95\% confidence
+intervals over 200 test images.}
+\label{fig:comparison_angles}
+\end{figure}
+
+
+TV is the strongest classical baseline throughout, consistent with MNIST digits being close to
+piecewise-constant. The learned prior overtakes TV as soon as the problem departs from the near
+noise-free, moderately-sampled regime. The PnP--TV gap peaks at about $+3.9$\,dB, at
+$\sigma=0.05$ with 20--40 angles; it is smaller at the extremes ($+2.2$\,dB at 5 angles,
+$+3.0$\,dB at 90 angles, $+1.0$\,dB at $\sigma=0.2$), with a corresponding SSIM improvement
+($0.74$ for TV to $0.94$ for PnP at $\sigma=0.05$, 20 angles; full SSIM table in the project
+repository). At $\sigma=0$ the learned prior underperforms TV by 6.4\,dB and the two are
+statistically indistinguishable at $\sigma=0.01$; Section~\ref{sec:crime-results} shows that the size of
+these two low-noise gaps depends on how well the data model matches the reconstruction model.
+
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.95\textwidth]{figures/fig_recon_grid.png}
+\caption{Qualitative in-distribution reconstructions at
+$\sigma=0.05$, 20 angles. Each row is one test digit; columns show
+the ground truth, the three classical baselines, PnP-DnCNN, and the
+absolute error map $|\hat{x}_{\text{PnP}} - x|$ (brighter = larger
+error). FBP and Tikhonov retain visible measurement noise; TV
+produces flat, blocky regions; PnP-DnCNN recovers the sharpest,
+most faithful strokes. The error maps show that residual error is
+concentrated almost entirely along stroke boundaries, with
+near-zero error in flat background and interior regions.}
+\label{fig:recon_grid}
+\end{figure}
+
+\subsection{E5: Why PnP selects few iterations}
+Validation tuning consistently selects a small number of PnP
+iterations (5--25 for $\ge 10$ angles and $\sigma\le 0.2$, and 100--400 for the 5-angle condition). Figure~\ref{fig:convergence}
+shows PSNR and the data-fidelity residual $\lVert Ax_k - y\rVert$ as a
+function of iteration count, for several values of $\sigma_d$, on 50
+test images. PSNR rises rapidly and peaks within the first 5--15
+iterations, then \emph{decays} to a lower plateau (e.g.\ $\sigma_d=0.1$:
+peak $\approx24.0$\,dB near iteration 10, plateau $\approx22.0$\,dB by
+iteration 400). Over the same range, the residual does not decrease;
+it rises and plateaus, more steeply for larger $\sigma_d$. This
+indicates that the iteration does not converge to a fixed point that
+is simultaneously data-consistent and maximally accurate: the
+denoiser's implicit prior increasingly dominates the data-fidelity
+term as iterations progress, without a corresponding gain in
+accuracy. Early stopping is therefore not an artifact of a
+coarse hyperparameter grid but an active, necessary part of the
+regularization.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.95\textwidth]{figures/fig_convergence.png}
+\caption{PnP-PGD convergence behavior for several denoising strengths
+$\sigma_d$ (50 test images, $\sigma=0.05$, 20 angles). Left: PSNR vs.\
+iteration, peaking early then decaying. Right: data-fidelity residual vs.\ iteration, rising and plateauing rather than decreasing.}
+\label{fig:convergence}
+\end{figure}
+
+\subsection{E3: Forward-model mismatch}
+Measurements are generated with the true 20-angle operator;
+reconstruction uses a perturbed operator with either a constant angle offset (rigid misregistration) or independent per-angle jitter, up to $4^\circ$, with all hyperparameters frozen at their $\sigma=0.05$, 20-angle values. Table~\ref{tab:e3} summarizes the extremes of the tested range.
+
+\begin{table}[htbp]
+\centering
+\caption{Test PSNR (dB) under forward-model mismatch, hyperparameters
+frozen at nominal values.}
+\label{tab:e3}
+\begin{tabular}{lcccc}
+\toprule
+Mismatch & TV ($0^\circ \to 4^\circ$) & PnP ($0^\circ \to 4^\circ$) & TV loss & PnP loss \\
+\midrule
+Constant offset & $20.2 \to 18.6$ & $24.0 \to 20.0$ & $1.6$\,dB & $4.0$\,dB \\
+Per-angle jitter & $20.2 \to 19.2$ & $24.0 \to 22.2$ & $1.0$\,dB & $1.8$\,dB \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+PnP remains more accurate than TV in absolute terms throughout the
+tested range, but degrades substantially faster in relative terms,
+particularly under a constant angular offset. Its advantage over TV
+narrows from $+3.85$\,dB at zero mismatch to $+1.48$\,dB at
+$4^\circ$ offset.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.95\textwidth]{figures/robust_mismatch.png}
+\caption{Test PSNR under forward-model mismatch, as a function of
+angular error $\delta$ (degrees), for a constant angle offset (left)
+and independent per-angle jitter (right). All hyperparameters are
+frozen at their nominal ($\delta=0$) values and not retuned per
+mismatch level. PnP-DnCNN remains the most accurate method throughout
+the tested range, but degrades faster than TV, particularly under the
+systematic offset: its advantage over TV narrows from $+3.85$\,dB at
+$\delta=0$ to $+1.48$\,dB at $\delta=4^\circ$. Error bars denote 95\%
+confidence intervals over 200 test images.}
+\label{fig:robust_mismatch}
+\end{figure}
+
+
+\subsection{E4: Distribution shift}
+The denoiser is trained exclusively on MNIST digits. We evaluate the
+full frozen pipeline (nominal $\sigma=0.05$, 20 angles) on
+Fashion-MNIST, EMNIST letters, and a resized Shepp-Logan phantom
+(single image, 20 independent noise draws). Table~\ref{tab:e4} and
+Figure~\ref{fig:shift} summarize the results.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.8\textwidth]{figures/robust_shift.png}
+\caption{Test PSNR under train--test distribution shift, for all four
+methods, with the reconstruction pipeline frozen at its nominal
+($\sigma=0.05$, 20 angles) hyperparameters. PnP-DnCNN leads on
+in-distribution MNIST and on EMNIST letters (a near-shift domain
+sharing digits' stroke-like statistics), but falls below TV and Tikhonov on Fashion-MNIST and the Shepp--Logan phantom (by 3.0 and 0.2\,dB on
+Fashion-MNIST, by 4.2 and 2.1\,dB on the phantom); it stays above FBP on Fashion-MNIST (16.6 vs.\ 14.9\,dB)
+and only marginally so on the phantom (15.0 vs.\ 14.8\,dB). TV is the most
+consistent performer across all four test sets. Error bars denote
+95\% confidence intervals; for the Shepp-Logan phantom, the interval
+reflects variation across 20 independent noise draws of a single
+image rather than variation across distinct images.}
+\label{fig:robust_shift}
+\end{figure}
+
+\begin{table}[htbp]
+\centering
+\caption{Test PSNR (dB) under train--test distribution shift, frozen pipeline.}
+\label{tab:e4}
+\begin{tabular}{lcccc}
+\toprule
+Test set & TV & PnP-DnCNN & PnP $-$ TV \\
+\midrule
+MNIST (in-distribution)  & 20.3 & \textbf{24.0} & $+3.7$ \\
+EMNIST letters (near shift) & 20.1 & \textbf{22.0} & $+1.9$ \\
+Fashion-MNIST (far shift) & \textbf{19.6} & 16.5 & $-3.1$ \\
+Shepp-Logan phantom (far shift) & \textbf{19.2} & 15.0 & $-4.2$ \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.6\textwidth]{figures/fig_shift_grid.png}
+\caption{Qualitative reconstructions under distribution shift. The
+learned prior recovers structure well on MNIST and EMNIST (both
+stroke-like), but imposes hallucinated digit/stroke-like structure on
+Fashion-MNIST and the CT phantom, both structurally unlike the
+training distribution.}
+\label{fig:shift}
+\end{figure}
+
+The learned prior generalizes to EMNIST letters, which share digits'
+stroke-based statistics, but underperforms TV on both far-shift test
+sets. Qualitatively (Figure~\ref{fig:shift}), the failure mode is not
+generic blur but hallucination: the denoiser imposes plausible-looking
+but incorrect digit/stroke-like structure on inputs unlike its
+training distribution.
+
+
+\subsection{E6: Sensitivity to the inverse crime}\label{sec:crime-results}
+Table~\ref{tab:crime} compares the PnP--TV gap under four data models. For $\sigma\ge0.05$ the model error is at
+most 7\% of the noise norm and the in-distribution PnP--TV gaps change by at most 0.3\,dB (bicubic data), so the conclusions of
+E1--E2 are unaffected. At $\sigma\le0.01$ they are not: TV remains ahead at $\sigma=0$ in every variant, but by 5.9\,dB with the
+nearest-neighbour object and by only 1.0\,dB with the smoother bilinear object, and at $\sigma=0.01$ PnP's lead ranges
+from $+0.07$ to $+1.76$\,dB. The low-noise ranking is therefore a function of the forward-model mismatch rather than a
+single number, which also explains the sign of the $\sigma=0$ result in E1. The out-of-distribution deficits of E4
+persist in every variant (Fashion-MNIST: $-2.8$ to $-3.9$\,dB; Shepp--Logan: $-4.2$ to $-5.4$\,dB). We use bicubic data,
+the intermediate choice, as the default crime-free setting; Table~\ref{tab:table1fine} repeats the E1--E2 comparison with it.
+ 
+\begin{table}[htbp]
+\centering\small\setlength{\tabcolsep}{5pt}
+\caption{PnP$-$TV PSNR gap (dB), 20 angles, 200 test images, for four data models. ``Model error'' is the mean
+$\|\mathcal{S}(x)-Ax\|_2$; for comparison the noise norm $\sigma\sqrt{m}$ is $0.28$, $1.41$, $2.83$, $5.66$ for
+$\sigma=0.01,\,0.05,\,0.1,\,0.2$. Hyperparameters are re-tuned for each data model.}\label{tab:crime}
+\begin{tabular}{lcccccc}
+\toprule
+Data model & Model error & $\sigma=0$ & $0.01$ & $0.05$ & $0.1$ & $0.2$\\
+\midrule
+Same operator (inverse crime)            & 0     & $-6.43$ & $+0.07$ & $+3.86$ & $+3.01$ & $+1.03$\\
+Fine grid, nearest                       & 0.03  & $-5.86$ & $+0.16$ & $+3.86$ & $+3.01$ & $+1.02$\\
+Fine grid, bicubic (default)             & 0.09  & $-3.29$ & $+1.02$ & $+4.02$ & $+3.10$ & $+1.08$\\
+Fine grid, bilinear                      & 0.10  & $-0.97$ & $+1.76$ & $+3.94$ & $+2.87$ & $+0.85$\\
+\bottomrule
+\end{tabular}
+\end{table}
+ 
+\begin{table}[htbp]
+\centering\small\setlength{\tabcolsep}{5pt}
+\caption{As Table~1, with measurements simulated on the finer grid (bicubic, $f=5$); mean test PSNR (dB) over 200 images.
+Significance tests are provided with the repository results.}\label{tab:table1fine}
+\begin{tabular}{lccccc}
+\toprule
+Condition & FBP & Tikhonov & TV & PnP-DnCNN & PnP$-$TV\\
+\midrule
+$\sigma=0$, 20 angles    & 24.3 & 27.4 & 33.2 & 29.9 & $-3.29$\\
+$\sigma=0.01$, 20 angles & 23.2 & 23.9 & 28.4 & 29.4 & $+1.02$\\
+$\sigma=0.05$, 20 angles & 15.5 & 17.1 & 20.1 & 24.1 & $+4.02$\\
+$\sigma=0.1$, 20 angles  & 10.4 & 14.7 & 16.8 & 19.9 & $+3.10$\\
+$\sigma=0.2$, 20 angles  &  6.6 & 12.9 & 14.3 & 15.3 & $+1.08$\\
+5 angles, $\sigma=0.05$  &  9.1 & 14.1 & 15.5 & 17.8 & $+2.36$\\
+10 angles, $\sigma=0.05$ & 12.1 & 15.9 & 18.2 & 21.5 & $+3.29$\\
+40 angles, $\sigma=0.05$ & 18.1 & 18.2 & 21.8 & 25.8 & $+3.97$\\
+90 angles, $\sigma=0.05$ & 20.7 & 20.0 & 24.1 & 27.3 & $+3.24$\\
+\bottomrule
+\end{tabular}
+\end{table}
+ 
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\linewidth]{figures/crime_comparison.png}
+\caption{PSNR versus noise level (left) and number of angles (right) for data simulated on the bicubic finer grid
+(solid) and with the inverse crime (dashed). The curves coincide for $\sigma\ge0.05$ and separate only at
+$\sigma\le0.01$, where TV loses most.}\label{fig:crime}
+\end{figure}
+ 
+\subsection{E7: Error decomposition along the singular vectors}\label{sec:nullspace-results}
+Table~\ref{tab:nullspace} reports the decomposition of Section~\ref{sec:subspace} at $\sigma=0.05$ and 20 angles
+($\dim W_{0.05}=319$). In distribution, PnP has about 0.4--0.5 times TV's error energy in \emph{both} the weakly
+determined subspace and its complement (null-space ratio 0.48, range-space ratio 0.40) and a better-aligned
+completion of the unobserved directions ($c=0.76$ versus $0.45$): the prior's advantage is not confined to
+filling in unobserved directions. Under shift both ratios exceed 1 on Fashion-MNIST (1.27 and 2.32) and on the
+phantom (2.59 and 2.64), so the failure is not confined to the weakly determined subspace either, and the largest part of
+the excess error lies in its complement. The injection statistic shows the hallucination signature: on the phantom PnP
+places $3.3$ times the true energy in $W_{0.05}$ (TV: $0.44$) with alignment $0.23$, while on MNIST its $0.76$ comes with
+alignment $0.76$. Within the iteration, the contraction of direction $i$ by the gradient step after $K$ iterations is
+$(1-(s_i/s_1)^2)^K$, so at $K=5$ a direction with $s_i=0.1\,s_1$ retains 95\% of its initial error, $s_i=0.3\,s_1$ 62\%
+and $s_i=0.5\,s_1$ 24\%: the tuned iteration leaves a large share of directions to the denoiser. On the shifted sets
+no setting of $(\sigma_d,K)$ recovers TV's accuracy: the best oracle setting still has $1.5$--$1.9$ times TV's error
+and the error grows with $K$ (to $3.7$--$4.6$ times at $K=400$; bilinear fine-grid data).
+ 
+\begin{table}[htbp]
+\centering\small\setlength{\tabcolsep}{4pt}
+\caption{Error decomposition at $\sigma=0.05$, 20 angles, bicubic fine-grid data, $W_{0.05}$ ($\dim=319$).
+Ratios are PnP/TV (below 1: PnP has less error); $\iota$ is the injection and $c$ the alignment statistic of
+Section~\ref{sec:subspace}.}\label{tab:nullspace}
+\begin{tabular}{lccccccc}
+\toprule
+ & \multicolumn{3}{c}{error ratio PnP/TV} & \multicolumn{2}{c}{$\iota$} & \multicolumn{2}{c}{$c$}\\
+\cmidrule(lr){2-4}\cmidrule(lr){5-6}\cmidrule(lr){7-8}
+Test set & in $W$ & in $W^\perp$ & total & TV & PnP & TV & PnP\\
+\midrule
+MNIST (in-dist.)  & 0.48 & 0.40 & 0.42 & 0.58 & 0.76 & 0.45 & 0.76\\
+EMNIST letters    & 0.70 & 0.64 & 0.65 & 1.22 & 1.55 & 0.43 & 0.67\\
+Fashion-MNIST     & 1.27 & 2.32 & 2.05 & 0.29 & 0.80 & 0.36 & 0.37\\
+Shepp--Logan      & 2.59 & 2.64 & 2.63 & 0.44 & 3.27 & 0.09 & 0.23\\
+\bottomrule
+\end{tabular}
+\end{table}
+ 
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\linewidth]{figures/nullspace_signature_fine5c.png}
+\caption{Hallucination signature (injection versus alignment in the weakly determined subspace) for TV and
+PnP-DnCNN on the four test sets (bicubic fine-grid data).}\label{fig:signature}
+\end{figure}
+ 
+\subsection{E8: Denoiser seeds and matched-prior control}\label{sec:seeds-results}
+Table~\ref{tab:seeds} reports the shift experiment with three denoisers per configuration (bicubic data, $\sigma=0.05$,
+20 angles; all methods re-tuned on the validation distribution of the respective prior). Seed-to-seed variation is at
+most 0.3\,dB, an order of magnitude below the effects of interest: on Fashion-MNIST the MNIST-trained prior is
+$3.10\pm0.30$\,dB below TV (range $-3.43$ to $-2.83$) and on the phantom $4.33\pm0.12$\,dB below. Training with
+$\sigma_{\max}=0.5$ instead of $0.3$ does not change these results (Fashion-MNIST $-3.12$, phantom $-3.94$\,dB) and,
+at $\sigma=0.2$, the tuned $\sigma_d$ is $0.3$ for all six MNIST denoisers although values up to $0.5$ were available, so
+the grid-edge tuning in E1 was not an artefact; the wider-range denoiser is slightly better at high noise
+($+1.44\pm0.11$ versus $+0.97\pm0.11$\,dB over TV at $\sigma=0.2$, ranges not overlapping) and slightly worse at
+$\sigma=0.05$.
+ 
+The matched-prior control isolates the cause of the reversal: a prior trained on Fashion-MNIST beats TV on
+Fashion-MNIST by $+2.21\pm0.01$\,dB (error ratio $0.63$), although less than the MNIST prior on MNIST ($+3.84$\,dB),
+since Fashion-MNIST images are less sparse. The control is clean: TV's PSNR is identical for all priors on every test
+set, i.e.\ tuning on Fashion-MNIST validation data selects the same TV weight. Transfer is asymmetric: the Fashion-trained
+prior still beats TV on MNIST ($+1.38$\,dB) and ties it on the phantom ($-0.18$\,dB, error ratio $1.05$), whereas the
+MNIST-trained prior loses by $4.3$\,dB on the phantom. The injection statistic on the phantom follows the prior: $2.8$--$3.4$
+for MNIST-trained denoisers versus $0.30$--$0.35$ for Fashion-trained ones, with identical noise and solver settings. Whether
+the broader prior helps because it is richer or because Fashion-MNIST resembles the phantom more cannot be decided with two
+training distributions.
+ 
+\begin{table}[htbp]
+\centering\small\setlength{\tabcolsep}{4pt}
+\caption{Distribution shift with three denoisers per prior (mean test PSNR in dB over seeds; gap = PnP$-$TV, mean $\pm$ s.d.\
+over seeds). Bicubic fine-grid data, $\sigma=0.05$, 20 angles; each prior's pipeline is tuned on the validation set of its
+own training distribution.}\label{tab:seeds}
+\begin{tabular}{lcccccc}
+\toprule
+ & & \multicolumn{2}{c}{MNIST-trained} & \multicolumn{2}{c}{Fashion-trained} \\
+\cmidrule(lr){3-4}\cmidrule(lr){5-6}
+Test set & TV & PnP & gap & PnP & gap\\
+\midrule
+MNIST          & 20.21 & 24.05 & $+3.84\pm0.03$ & 21.60 & $+1.38\pm0.09$\\
+EMNIST letters & 20.28 & 22.07 & $+1.79\pm0.09$ & 20.73 & $+0.44\pm0.09$\\
+Fashion-MNIST  & 19.42 & 16.32 & $-3.10\pm0.30$ & 21.63 & $+2.21\pm0.01$\\
+Shepp--Logan   & 19.28 & 14.96 & $-4.33\pm0.12$ & 19.10 & $-0.18\pm0.08$\\
+\bottomrule
+\end{tabular}
+\end{table}
+ 
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\linewidth]{figures/step4_summary.png}
+\caption{Left: PnP$-$TV gap for each denoiser seed (dots) on the four test sets, for three priors. Right: gap in the
+in-distribution noise sweep for MNIST-trained denoisers with $\sigma_{\max}=0.3$ and $0.5$.}\label{fig:seeds}
+\end{figure}
+ 
+\subsection{E9: Lesion insertion}\label{sec:lesion-results}
+Table~\ref{tab:lesion} and Figure~\ref{fig:lesion-summary} summarise the lesion experiment (three denoisers per prior,
+protocol of Section~\ref{sec:lesion}). Three observations hold across lesion types.
+ 
+\emph{TV detects small lesions better than PnP, in distribution and for a matched prior.} For the MNIST-trained prior on MNIST
+the paired AUC of PnP is $0.04$--$0.23$ below TV's (for example $0.69$ versus $0.91$ for $\sigma_l=0.75$, $c=0.5$), although
+PnP is about $4$\,dB better in PSNR on the same images; for the matched Fashion-trained prior the deficit is $0.03$--$0.17$. The
+two methods tie only for the largest high-contrast lesion. FBP and Tikhonov also detect small lesions better than PnP
+(paired AUC $0.92$ at $\sigma_l=0.75$, $c=0.5$ on MNIST), at the cost of many false blobs (up to $6$ per image for FBP).
+ 
+\emph{In distribution PnP attenuates lesions and invents none.} Its retention is $0.12$--$0.78$ for the MNIST prior on MNIST
+and $0.16$--$0.49$ for the matched prior (TV: $0.29$--$0.88$ and $0.38$--$0.83$), and it produces at most $0.01$ false lesions per
+image against up to $0.26$ for TV. The reconstructions are cleaner than TV's but the inserted lesion is often absent
+(Figure~\ref{fig:lesion-examples}), so a visually convincing image does not imply a faithful one.
+ 
+\emph{Under prior mismatch PnP invents structure.} For the MNIST-trained prior on Fashion-MNIST the retention is $0.78$--$1.04$ (the
+lesion survives) but there are $0.20$--$0.66$ false lesions per image against $\le0.20$ for TV, and the paired AUC remains below
+TV's by $0.05$--$0.16$. The matched Fashion-trained prior on the same images produces at most $0.01$. Lesion observability
+(Section~\ref{sec:lesion}) does not explain these differences: the observability terciles formed within each lesion type span
+only $0.87$--$0.95$ on average, and PnP's AUC does not increase with observability; smaller lesions are harder for all methods, but this is confounded with size.
+ 
+\begin{table}[htbp]
+\centering\small\setlength{\tabcolsep}{3.5pt}
+\caption{Lesion insertion, mean over three denoisers per prior (200 test images, $\sigma=0.05$, 20 angles, bicubic data), for two
+of the eight lesion types ($\sigma_l/c$ = lesion size in px / contrast). pAUC: paired AUC; Ret.: retention; FL: false lesions per
+lesion-absent image. All methods use their PSNR-tuned settings.}\label{tab:lesion}
+\begin{tabular}{llcccccccc}
+\toprule
+ & & \multicolumn{2}{c}{pAUC} & \multicolumn{2}{c}{Ret.} & \multicolumn{2}{c}{FL}\\
+\cmidrule(lr){3-4}\cmidrule(lr){5-6}\cmidrule(lr){7-8}
+Prior $\to$ test set & $\sigma_l/c$ & TV & PnP & TV & PnP & TV & PnP\\
+\midrule
+MNIST $\to$ MNIST (in-dist.)       & 0.75/0.5  & 0.91 & 0.69 & 0.59 & 0.28 & 0.005 & 0.000\\
+                                   & 1.25/0.25 & 0.90 & 0.69 & 0.62 & 0.30 & 0.005 & 0.000\\
+MNIST $\to$ Fashion (shifted)      & 0.75/0.5  & 0.91 & 0.82 & 0.63 & 0.99 & 0.030 & 0.430\\
+                                   & 1.25/0.25 & 0.93 & 0.76 & 0.59 & 0.87 & 0.030 & 0.428\\
+Fashion $\to$ Fashion (in-dist.)   & 0.75/0.5  & 0.91 & 0.75 & 0.63 & 0.22 & 0.030 & 0.005\\
+                                   & 1.25/0.25 & 0.93 & 0.80 & 0.59 & 0.23 & 0.030 & 0.005\\
+Fashion $\to$ MNIST (shifted)      & 0.75/0.5  & 0.91 & 0.75 & 0.59 & 0.35 & 0.005 & 0.000\\
+                                   & 1.25/0.25 & 0.90 & 0.78 & 0.62 & 0.36 & 0.005 & 0.000\\
+\bottomrule
+\end{tabular}
+\end{table}
+ 
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\linewidth]{figures/step5_summary.png}
+\caption{Paired detection AUC (top) and false lesions per lesion-absent image (bottom) for TV and PnP-DnCNN in the four
+prior/test-set combinations and the eight lesion types (mean over three denoisers; bars: s.d.\ over seeds).}\label{fig:lesion-summary}
+\end{figure}
+ 
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.85\linewidth]{figures/lesion_f03_s2_examples_fashion.png}
+\caption{Matched Fashion-trained prior on Fashion-MNIST ($\sigma_l=0.75$, $c=0.5$). Rows: ground truth with lesion, TV and
+PnP reconstructions of the lesion-present image; ground truth, TV and PnP reconstructions of the lesion-absent image. The
+red circle marks the lesion location. PnP produces the cleaner images but removes the lesion.}\label{fig:lesion-examples}
+\end{figure}
+ 
+\subsection{E10: Can re-tuning recover lesion detectability?}\label{sec:oppoint-results}
+The PSNR-tuned operating point of PnP is not necessarily the best one for lesion detection, so we sweep operating points
+(Section~\ref{sec:lesion}) and compare three rules for PnP---PSNR-tuned, best paired AUC on the selection set (``lesion''),
+and best paired AUC among points whose selection-set PSNR is at least that of tuned TV (``constrained'')---with TV. Table~\ref{tab:oppoint}
+and Figure~\ref{fig:oppoint} show one denoiser per prior. For the MNIST-trained prior in distribution, the constrained point keeps
+a $+0.7$\,dB PSNR advantage over TV (the PSNR-tuned advantage was $+4.0$\,dB) but its paired AUC is still $0.06$ below TV's, and
+its false-lesion rate rises to 12 times TV's; the lesion-tuned point matches TV's detection but has lower PSNR than TV and 60
+times TV's false-lesion rate ($0.32$ versus $0.005$ per image). For the matched Fashion-trained prior the constrained point keeps
+$+1.0$\,dB over TV, with a paired AUC within $0.02$--$0.03$ of TV's (about one standard error) and $0.085$ false lesions per image against
+$0.03$ for TV. Under shift, operating points chosen in distribution do not protect: for the MNIST prior on Fashion-MNIST all three
+rules are $2.1$--$2.8$\,dB below TV in PSNR and produce $0.40$--$0.51$ false lesions per image against $0.03$. Hence PSNR, detectability and
+fabricated structure trade against each other, and only a matched prior leaves a point at which PnP is competitive with TV on all
+three.
+ 
+\begin{table}[htbp]
+\centering\small\setlength{\tabcolsep}{4pt}
+\caption{Operating points for lesion type $\sigma_l=0.75$, $c=0.5$ on the test sets (one denoiser per prior; points chosen on
+held-out in-distribution validation images). PSNR is that of the lesion-absent reconstruction.}\label{tab:oppoint}
+\begin{tabular}{llccc}
+\toprule
+Prior $\to$ test set & Operating point & PSNR (dB) & pAUC & FL\\
+\midrule
+MNIST $\to$ MNIST (in-dist.)     & TV (PSNR-tuned)  & 20.11 & 0.910 & 0.005\\
+                                 & PnP, PSNR-tuned  & 24.07 & 0.693 & 0.000\\
+                                 & PnP, constrained & 20.84 & 0.849 & 0.060\\
+                                 & PnP, lesion      & 19.57 & 0.916 & 0.315\\
+MNIST $\to$ Fashion (shifted)    & TV (PSNR-tuned)  & 19.37 & 0.914 & 0.030\\
+                                 & PnP, PSNR-tuned  & 16.58 & 0.822 & 0.420\\
+                                 & PnP, constrained & 17.32 & 0.886 & 0.405\\
+                                 & PnP, lesion      & 16.78 & 0.903 & 0.505\\
+Fashion $\to$ Fashion (in-dist.) & TV (PSNR-tuned)  & 19.37 & 0.914 & 0.030\\
+                                 & PnP, PSNR-tuned  & 21.58 & 0.751 & 0.005\\
+                                 & PnP, constrained & 20.41 & 0.897 & 0.085\\
+                                 & PnP, lesion      & 19.07 & 0.870 & 0.255\\
+Fashion $\to$ MNIST (shifted)    & TV (PSNR-tuned)  & 20.11 & 0.910 & 0.005\\
+                                 & PnP, PSNR-tuned  & 21.67 & 0.759 & 0.000\\
+                                 & PnP, constrained & 21.13 & 0.855 & 0.015\\
+                                 & PnP, lesion      & 21.21 & 0.898 & 0.040\\
+\bottomrule
+\end{tabular}
+\end{table}
+ 
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\linewidth]{figures/oppoint_m03_s0.png}
+\caption{PSNR of the lesion-absent reconstruction versus paired detection AUC over all operating points of PnP (colour:
+$\sigma_d$; marker size: iterations) and TV (line: weight sweep) for the MNIST-trained denoiser. Markers show the selected
+operating points. Left: in distribution; right: Fashion-MNIST (shifted).}\label{fig:oppoint}
+\end{figure}
+
+
+
+
+
+\section{Discussion}
+\label{sec:discussion}
+
+Six findings emerge from this study.
+ 
+First, the learned prior's accuracy advantage over TV is conditional rather than universal. It is large and
+significant at moderate noise and for moderate undersampling ($\approx+3.9$\,dB at $\sigma=0.05$ with 20--40 angles),
+smaller at the extremes of both ranges, and in the near noise-free regime TV remains ahead by an amount that depends on
+how well the data model matches the reconstruction model (Section~\ref{sec:crime-results}). Reporting a single aggregate
+accuracy number for a learned reconstruction method without specifying the operating regime and the data model is
+therefore misleading.
+ 
+Second, PnP-PGD with an unconstrained CNN denoiser does not behave like a convergent optimization scheme: accuracy peaks
+after a handful of iterations and then degrades while the data residual rises (Section~4.2). This is consistent with the
+observation that convergence guarantees need constraints on the denoiser (e.g.\ non-expansiveness)~\cite{ryu2019pnp}. Our
+decomposition adds a mechanism: with step $\eta=1/L$ the data step contracts the error in direction $i$ by
+$(1-(s_i/s_1)^2)^K$, so after the few iterations selected by validation, directions with $s_i<0.3\,s_1$ are
+barely corrected and the reconstruction there is largely the denoiser's. Iteration count is thus an implicit
+regularization hyperparameter, and not an implementation detail.
+ 
+Third, the reversal under distribution shift is a failure of the prior, not of the scheme. The matched-prior control
+(Section~\ref{sec:seeds-results}) shows that PnP beats TV on Fashion-MNIST when the denoiser was trained on it, and the
+error decomposition shows that the mismatched prior places up to three times the true energy in the weakly determined
+subspace. The effect is robust: it exceeds seed-to-seed variation by an order of magnitude, persists under every
+data model we tested, and cannot be removed by changing $\sigma_d$ or the iteration count. At the same time the
+failure is not confined to the weakly determined subspace, so ``hallucination'' in the null-space sense is an
+incomplete description.
+ 
+Fourth, PSNR is not task performance. In distribution, the PSNR-tuned PnP reconstruction is about $4$\,dB better than TV yet
+detects small inserted lesions markedly less reliably, because it attenuates them (Section~\ref{sec:lesion-results}). The
+errors take two forms: erasure of unfamiliar small features when the prior is adequate, and invention of lesion-like
+blobs when it is not. Re-tuning trades one against the other (Section~\ref{sec:oppoint-results}); only a matched prior leaves a
+point that is competitive with TV on PSNR, detection and false structure at once, and operating points chosen in
+distribution do not protect under shift.
+ 
+Fifth, the learned method loses its advantage faster than TV under forward-model mismatch: it remains more accurate
+throughout the tested range but its margin falls from $+3.85$\,dB to $+1.48$\,dB at a $4^\circ$ offset
+(Section~4.3). This experiment was run with data generated by the nominal operator and should be repeated on finer-grid data.
+ 
+Sixth, evaluation protocol matters. The inverse crime changes the low-noise PnP--TV gap by up to 5.5\,dB; a single denoiser
+instance would have reported anywhere between $-2.83$ and $-3.43$\,dB for Fashion-MNIST depending on the seed; and operating
+points for the lesion task were therefore chosen on held-out images rather than on the evaluation images, to avoid overstating the
+benefit of re-tuning. These
+results are consistent with broader findings on instabilities in learned reconstruction~\cite{antun2020instabilities,darestani2021shift} and
+support the view that in-distribution accuracy alone is an insufficient basis for adopting a learned prior; mismatch,
+shift, seed and task-based evaluation should be a standard part of such studies, not an optional addendum.
+ 
+
+
+
+\section{Conclusion}
+\label{sec:conclusion}
+
+We presented a controlled, small-scale comparison of classical and learned regularization for sparse-view CT reconstruction under
+noise, angular undersampling, forward-model mismatch, distribution shift and a lesion-detection task. The learned
+Plug-and-Play prior outperforms TV by up to $\approx4$\,dB at moderate-to-high noise and for 5--90 angles, but the advantage is
+conditional: the near noise-free ranking depends on the data model, the margin narrows under forward-model mismatch, and it reverses
+under distribution shift. The reversal is caused by a mismatched prior rather than by the PnP scheme: a prior trained on the shifted
+distribution beats TV on it, and the mismatched prior fills the weakly determined subspace with up to three times the true energy. In
+a task-based evaluation, the PSNR-tuned PnP reconstruction attenuates small lesions in distribution and invents lesion-like blobs under
+mismatch; re-tuning recovers TV-level detection only by giving up the PSNR advantage or by increasing false structure, except for a matched
+prior. The iteration used here lacks a stable, accurate fixed point, so early stopping acts as a regularizer. Future work should extend
+this study to larger, clinical-resolution data such as LoDoPaB-CT~\cite{leuschner2021} with patient-disjoint splits, matrix-free operators
+and Poisson noise, and to provably convergent PnP variants and learned priors trained on diverse anatomy.
+ 
+
+\section*{Limitations}
+The study is intentionally small (28$\times$28 MNIST-derived images) so that a thorough experimental grid is possible; trends
+may not transfer to natural-image or clinical CT resolution and geometry. Experiments E1--E5 use data generated with the
+reconstruction operator (an inverse crime); the crime-free experiments E6--E10 use bicubic finer-grid data, and the sensitivity band
+of Table~\ref{tab:crime} shows that the near noise-free ranking depends on this choice. The convergence study (E5) and the
+forward-model mismatch study (E3) were not repeated on finer-grid data. Seed variation is estimated from three denoisers per
+configuration, which gives only a crude standard deviation, and the Shepp--Logan test set is a single image with 20 noise draws, so its
+intervals reflect noise rather than image variation. The error-decomposition statistics cannot separate prior-driven structure from
+amplified noise except in comparisons with identical noise and settings, and the observability analysis of lesions is
+confounded with lesion size and location. The lesion study uses bright additive Gaussian blobs, a location-known observer and a
+false-lesion threshold that is a modelling choice, so false-lesion rates are meaningful for comparing methods but not as absolute rates;
+the operating-point study uses one denoiser per prior, two lesion types and a coarse grid. Only two training distributions were
+compared, so the explanation of the asymmetric transfer between them remains a hypothesis. The PnP scheme has no convergence guarantee,
+and only moderate forward-model mismatches (up to $4^\circ$) were evaluated.
+ 
+\section*{Reproducibility}
+Code, trained models, all raw result files and figures are available at
+\url{https://github.com/AboOraig/learned-regularization}. The experiments of this version are run, in order, by
+\texttt{run\_nullspace.py} (E6, E7), \texttt{run\_spectral.py} (iteration and spectral analysis), \texttt{run\_step4.py} and
+\texttt{summarize\_step4.py} (E8), \texttt{run\_lesions.py} and \texttt{summarize\_step5.py} (E9), and \texttt{run\_oppoint.py} (E10);
+the unit tests are run with \texttt{python -m pytest tests}.
+
+
+
+\bibliographystyle{plainnat}
+\bibliography{references}
+
+
+\end{document}

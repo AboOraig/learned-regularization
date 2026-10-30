@@ -78,29 +78,7 @@ PnP-DnCNN. FBP and Tikhonov retain visible noise; TV looks blocky;
 PnP-DnCNN is visually closest to the ground truth. Error is
 concentrated on stroke edges, not flat regions.
 
-## 3. Why so few PnP iterations? (E5 ablation)
-
-Validation tuning consistently selects very few PnP iterations
-(5-25 depending on the condition). The convergence study
-(`fig_convergence.png`, 50 test images, sigma_d in {0.02, 0.05, 0.1, 0.2},
-400 iterations) shows why: PSNR rises quickly, **peaks around iteration
-5-15, and then decays to a lower plateau** (e.g. sigma_d=0.1: peak
-~24.0 dB near iteration ~10, plateau ~22.0 dB by iteration 400).
-Simultaneously the data-fidelity residual ||A x_k - y|| does *not*
-decrease with iteration; it rises and plateaus, more so for larger
-sigma_d.
-
-**Finding 2.** This PnP-PGD scheme does not converge to a fixed point
-that is both data-consistent and maximally accurate. The CNN denoiser
-has no non-expansiveness guarantee, so continued iteration trades data
-fidelity for an increasingly strong (and increasingly biased) prior
-pull. Early stopping is therefore not a tuning artifact but a
-necessary, active part of the regularization; this is consistent with
-know limitations of PnP methods using unconstrained deep denoisers
-(Ryu et al. 2019 and related PnP-convergence literature discuss this
-trade-off explicitly).
-
-## 4. Forward-model mismatch (E3)
+## 3. Forward-model mismatch (E3)
 
 Data are generated with the true 20-angle operator; reconstruction
 uses a wrong operator with either a constant angle offset (rigid
@@ -131,7 +109,7 @@ edges, which are penalized more by geometric misregistration than a
 smoother TV reconstruction; this is a hypothesis, not something
 independently verified here.
 
-## 5. Distribution shift (E4)
+## 4. Distribution shift (E4)
 
 The denoiser is trained only on MNIST digits. At test time the same
 frozen pipeline (sigma=0.05, 20 angles) is applied to Fashion-MNIST,
@@ -148,8 +126,7 @@ draws).
 ![Robustness to distribution shift](results/robust_shift.png)
 **Figure: PSNR under train-test distribution shift**, frozen pipeline
 (sigma=0.05, 20 angles). PnP-DnCNN leads on MNIST (in-distribution)
-and EMNIST (near-shift), but drops below every classical baseline on
-Fashion-MNIST and the Shepp-Logan phantom (far-shift). TV is the most
+and EMNIST (near-shift), but drops below TV and Tikhonov on Fashion-MNIST and the Shepp-Logan phantom (far-shift); it stays above FBP on Fashion-MNIST (16.6 vs 14.9 dB) and only marginally on the phantom (15.0 vs 14.8 dB). TV is the most
 consistent method across all four sets. Note: the Shepp-Logan error
 bar reflects noise-draw variation on a single image, not image-to-image
 variation like the other three bars.
@@ -165,29 +142,72 @@ structured while being wrong. This is the central limitation of the
 project and the main argument for out-of-distribution testing of any
 learned prior before deployment.
 
-## 6. Limitations
+## 5. Why so few PnP iterations? (E5 ablation)
+
+Validation tuning consistently selects very few PnP iterations
+(5-25 for >= 10 angles and sigma <= 0.2; 100-400 for the 5-angle condition).
+ The convergence study (`fig_convergence.png`, 50 test images, sigma_d in {0.02, 0.05, 0.1, 0.2},
+400 iterations) shows why: PSNR rises quickly, **peaks around iteration
+5-15, and then decays to a lower plateau** (e.g. sigma_d=0.1: peak
+~24.0 dB near iteration ~10, plateau ~22.0 dB by iteration 400).
+Simultaneously the data-fidelity residual ||A x_k - y|| does *not*
+decrease with iteration; it rises and plateaus, more so for larger
+sigma_d.
+
+**Finding 2.** This PnP-PGD scheme does not converge to a fixed point
+that is both data-consistent and maximally accurate. The CNN denoiser
+has no non-expansiveness guarantee, so continued iteration trades data
+fidelity for an increasingly strong (and increasingly biased) prior
+pull. Early stopping is therefore not a tuning artifact but a
+necessary, active part of the regularization; this is consistent with
+know limitations of PnP methods using unconstrained deep denoisers
+(Ryu et al. 2019 and related PnP-convergence literature discuss this
+trade-off explicitly).
+
+## 6. Inverse crime (E6)
+Measurements are also simulated on a 5x finer grid (nearest / bicubic / bilinear object). For sigma >= 0.05 the
+PnP-TV gaps change by <= 0.3 dB (bicubic) so E1-E2 are unaffected. At sigma <= 0.01 the gap depends on the model
+mismatch: sigma=0: -6.43 (crime), -5.86 (nearest), -3.29 (bicubic), -0.97 dB (bilinear); sigma=0.01: +0.07, +0.16,
++1.02, +1.76 dB. TV stays ahead at sigma=0 in every variant. The out-of-distribution deficits persist (Fashion
+-2.8 to -3.9 dB, Shepp-Logan -4.2 to -5.4 dB).
+
+## 7. Error decomposition (E7)
+Subspace W of right singular vectors with s < 0.05 s_max (319 of 784 dims at 20 angles). In distribution PnP/TV error
+ratio is 0.48 in W and 0.40 outside W (alignment 0.76 vs 0.45). On Shepp-Logan PnP places 3.3x the true energy in W
+(TV 0.44) with alignment 0.23; on Fashion-MNIST the ratios are 1.27 (W) and 2.32 (outside W).
+
+## 8. Seeds and matched prior (E8)
+Seed-to-seed s.d. <= 0.3 dB. MNIST prior vs TV: MNIST +3.84 +/- 0.03, EMNIST +1.79 +/- 0.09, Fashion -3.10 +/- 0.30,
+Shepp-Logan -4.33 +/- 0.12 dB. Fashion-trained prior: Fashion +2.21 +/- 0.01, MNIST +1.38, EMNIST +0.44, Shepp-Logan
+-0.18 dB. The reversal is a prior-mismatch effect, not a PnP failure. sigma_max 0.5 does not change the shift results;
+at sigma=0.2 the tuned sigma_d is 0.3 for all six MNIST denoisers (not a grid-edge artefact).
+
+## 9. Lesion insertion (E9)
+Paired AUC of PnP is below TV's in every condition except for the largest high-contrast lesion (e.g. 0.69 vs 0.91 for a
+0.75 px, contrast 0.5 lesion, MNIST prior on MNIST). In distribution PnP attenuates lesions (retention 0.12-0.78 vs
+0.29-0.88 for TV) and produces <= 0.01 false lesions/image; under prior mismatch (MNIST prior on Fashion) lesions survive
+(retention 0.78-1.04) but 0.20-0.66 false lesions/image appear (TV <= 0.20; matched prior <= 0.01).
+
+## 10. Operating points (E10)
+Re-tuning PnP towards lesion fidelity recovers TV-level detection only by giving up its PSNR advantage or by
+raising false lesions: MNIST prior in distribution, constrained point +0.7 dB over TV with paired AUC -0.06 and 12x TV's
+false-lesion rate; lesion-tuned point 0.5 dB below TV with 60x its false-lesion rate. With a matched Fashion prior the
+constrained point keeps +1.0 dB over TV with AUC within 0.02-0.03 of TV's. Under shift, operating points chosen in
+distribution do not protect (2.1-2.8 dB below TV, 0.40-0.51 false lesions/image).
+
+## 11. Limitations
 
 - Trained and evaluated at small scale (28x28 MNIST-derived images);
   trends may not transfer directly to natural-image or clinical CT
   resolution and geometry.
 - Same forward operator used to generate and (in E1/E2/E4) reconstruct
   data ("inverse crime"); E3 partially addresses this via mismatch.
-- A single trained denoiser instance; significance tests are over test
-  images for one training run, not over independent retrainings.
-- The PnP scheme has no convergence guarantee, and behaves accordingly
-  (Section 3); results depend on early stopping being tuned correctly.
+- E1-E5 use data generated with the reconstruction operator (inverse crime); E6-E10 use bicubic finer-grid data and
+  Section 7 gives the sensitivity band. E3 and E5 were not repeated on finer-grid data.
+- Three denoisers per configuration in E8-E10 (crude s.d.); one in E1-E5. Shepp-Logan is a single image.
+- Lesion study: bright additive Gaussian blobs, location-known observer, modelling-choice false-lesion threshold; the
+  operating-point study uses one denoiser per prior and two lesion types.
+- Only two training distributions were compared; the asymmetric transfer is a hypothesis.
 - Mismatch levels tested (angle error up to 4 degrees) are moderate;
   larger or structurally different mismatches were not tested.
 
-## 7. Reproducing
-
-```
-pip install -r requirements.txt
-python train_denoiser.py --epochs 8
-python run_baselines.py --exp noise && python run_baselines.py --exp angles
-python run_pnp.py --exp noise && python run_pnp.py --exp angles
-python make_plots.py --exp noise && python make_plots.py --exp angles
-python run_robustness.py --exp mismatch && python run_robustness.py --exp shift
-python make_figures.py
-python make_summary.py
-```
