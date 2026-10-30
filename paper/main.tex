@@ -46,6 +46,14 @@ structure, whereas under prior mismatch it creates lesion-like blobs up to an or
 than TV. Re-tuning towards lesion fidelity recovers TV-level detection only at the price of its PSNR advantage
 or of false structure. We argue that task-based and robustness evaluation should be standard components of
 learned-prior reconstruction studies.
+We then replace the explicit forward matrix by a matrix-free operator with an exactly matched adjoint and
+the Gaussian noise by a Beer--Lambert Poisson model with 10--1000 photons per ray; the ranking of the methods,
+the reversal under distribution shift and the lesion results are unchanged, so they do not depend on a
+dense operator or on additive Gaussian noise.
+
+
+
+
 \end{abstract}
 
 
@@ -110,6 +118,9 @@ evaluation alone.
 \item An error decomposition along the singular vectors of the forward operator, separating the weakly determined subspace from its orthogonal complement, with an ``injection'' and an ``alignment'' statistic that quantify prior-driven content (Section~\ref{sec:nullspace-results}).
 \item Controls for the learned prior itself: three denoiser seeds, a wider training noise range, and a  matched-prior control trained on the shifted distribution (Section~\ref{sec:seeds-results}).
 \item A task-based evaluation by lesion insertion, with an operating-point study asking whether the detectability loss can be removed by re-tuning (Sections~\ref{sec:lesion-results} and \ref{sec:oppoint-results}).
+\item A matrix-free implementation of the projector and its exact adjoint, validated against the dense operator, and a
+      Poisson (low-dose) noise study, showing that the conclusions above carry over to the settings required for
+      clinical-size data (Sections~\ref{sec:mf-results}--\ref{sec:lesion-poisson}).
 \end{itemize}
 
 \section{Related Work}
@@ -316,6 +327,31 @@ $K\in\{1,2,3,5,10,25,50,100,200\}$) and 9 values of the TV weight, choose operat
 test sets, so that the choice is neither made on the evaluation images nor informed by the shifted distribution.
 
 
+\subsection{Matrix-free operator}\label{sec:mf}
+Up to this point the forward operator $A$ was stored as a dense $800\times784$ matrix, which allows exact adjoints,
+closed-form Tikhonov inverses and a full singular value decomposition, but does not scale to clinical image sizes. We
+therefore implemented a matrix-free operator that is never assembled. The forward projection embeds the image in a
+$40\times40$ canvas (the diagonal of the image, as in the dense operator), rotates it by each angle with bilinear
+interpolation about the pixel used by the reference implementation, and sums along the detector rows. The adjoint is the
+exact transpose of this discretisation, obtained by reverse-mode differentiation, so $\langle Ax,y\rangle=\langle x,A^{\top}y\rangle$
+holds to floating-point precision by construction rather than approximately. The classical baselines use only forward
+and adjoint applications: Tikhonov by conjugate gradients on $A^{\top}A+\lambda I$, and TV by the same ADMM as before with the $x$-update solved by
+conjugate gradients. The singular subspaces used in Section~\ref{sec:subspace} are obtained with a randomized SVD
+\cite{halko2011} (power iterations and oversampling, forward and adjoint products only); the error split in
+Section~\ref{sec:nullspace-results} then uses the well-determined subspace $\{i: s_i/s_1\ge0.05\}$ and its complement.
+ 
+\subsection{Poisson noise}\label{sec:poisson}
+Low-dose CT measures photon counts. With $p=Ax$ the (normalised) line integrals, the expected counts are
+$I=I_0\exp(-\mu p)$ with $I_0$ incident photons per ray and attenuation scale $\mu=2$; the counts are
+$N\sim\mathrm{Poisson}(I)$ and the data used for reconstruction are $\hat p=-\mu^{-1}\log(\max(N,1)/I_0)$.
+The noise in $\hat p$ is signal dependent, with variance approximately $e^{\mu p}/(I_0\mu^2)$, and is larger along
+rays that pass through more material. We use $I_0\in\{1000,300,100,30,10\}$, which gives an effective noise
+standard deviation of $0.018,0.032,0.056,0.106,0.198$ on the sinogram and therefore spans the Gaussian range
+$\sigma\in[0.02,0.2]$ of the earlier experiments. The data are generated from the finer-grid object
+(Section~\ref{sec:crimefree}, bicubic, factor 5), so the inverse crime remains removed. The reconstruction methods are
+unchanged and treat $\hat p$ with an unweighted least-squares data term (a Gaussian approximation); for PnP we also
+tested a variant with weights $w=N/I_0$ (an inverse-variance weighting up to a constant). All hyperparameters are tuned at each dose on 100 held-out MNIST validation images
+and frozen for every test set.
 
 
 
@@ -400,32 +436,6 @@ near-zero error in flat background and interior regions.}
 \label{fig:recon_grid}
 \end{figure}
 
-\subsection{E5: Why PnP selects few iterations}
-Validation tuning consistently selects a small number of PnP
-iterations (5--25 for $\ge 10$ angles and $\sigma\le 0.2$, and 100--400 for the 5-angle condition). Figure~\ref{fig:convergence}
-shows PSNR and the data-fidelity residual $\lVert Ax_k - y\rVert$ as a
-function of iteration count, for several values of $\sigma_d$, on 50
-test images. PSNR rises rapidly and peaks within the first 5--15
-iterations, then \emph{decays} to a lower plateau (e.g.\ $\sigma_d=0.1$:
-peak $\approx24.0$\,dB near iteration 10, plateau $\approx22.0$\,dB by
-iteration 400). Over the same range, the residual does not decrease;
-it rises and plateaus, more steeply for larger $\sigma_d$. This
-indicates that the iteration does not converge to a fixed point that
-is simultaneously data-consistent and maximally accurate: the
-denoiser's implicit prior increasingly dominates the data-fidelity
-term as iterations progress, without a corresponding gain in
-accuracy. Early stopping is therefore not an artifact of a
-coarse hyperparameter grid but an active, necessary part of the
-regularization.
-
-\begin{figure}[htbp]
-\centering
-\includegraphics[width=0.95\textwidth]{figures/fig_convergence.png}
-\caption{PnP-PGD convergence behavior for several denoising strengths
-$\sigma_d$ (50 test images, $\sigma=0.05$, 20 angles). Left: PSNR vs.\
-iteration, peaking early then decaying. Right: data-fidelity residual vs.\ iteration, rising and plateauing rather than decreasing.}
-\label{fig:convergence}
-\end{figure}
 
 \subsection{E3: Forward-model mismatch}
 Measurements are generated with the true 20-angle operator;
@@ -525,6 +535,34 @@ sets. Qualitatively (Figure~\ref{fig:shift}), the failure mode is not
 generic blur but hallucination: the denoiser imposes plausible-looking
 but incorrect digit/stroke-like structure on inputs unlike its
 training distribution.
+
+
+\subsection{E5: Why PnP selects few iterations}
+Validation tuning consistently selects a small number of PnP
+iterations (5--25 for $\ge 10$ angles and $\sigma\le 0.2$, and 100--400 for the 5-angle condition). Figure~\ref{fig:convergence}
+shows PSNR and the data-fidelity residual $\lVert Ax_k - y\rVert$ as a
+function of iteration count, for several values of $\sigma_d$, on 50
+test images. PSNR rises rapidly and peaks within the first 5--15
+iterations, then \emph{decays} to a lower plateau (e.g.\ $\sigma_d=0.1$:
+peak $\approx24.0$\,dB near iteration 10, plateau $\approx22.0$\,dB by
+iteration 400). Over the same range, the residual does not decrease;
+it rises and plateaus, more steeply for larger $\sigma_d$. This
+indicates that the iteration does not converge to a fixed point that
+is simultaneously data-consistent and maximally accurate: the
+denoiser's implicit prior increasingly dominates the data-fidelity
+term as iterations progress, without a corresponding gain in
+accuracy. Early stopping is therefore not an artifact of a
+coarse hyperparameter grid but an active, necessary part of the
+regularization.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=0.95\textwidth]{figures/fig_convergence.png}
+\caption{PnP-PGD convergence behavior for several denoising strengths
+$\sigma_d$ (50 test images, $\sigma=0.05$, 20 angles). Left: PSNR vs.\
+iteration, peaking early then decaying. Right: data-fidelity residual vs.\ iteration, rising and plateauing rather than decreasing.}
+\label{fig:convergence}
+\end{figure}
 
 
 \subsection{E6: Sensitivity to the inverse crime}\label{sec:crime-results}
@@ -782,12 +820,135 @@ operating points. Left: in distribution; right: Fashion-MNIST (shifted).}\label{
 
 
 
+\subsection{E11: The matrix-free operator reproduces the dense pipeline}\label{sec:mf-results}
+Table~\ref{tab:mf} compares the two implementations on the same 200 noisy test images ($\sigma=0.05$, 20 angles, bicubic
+fine-grid data). The projections agree to $3\times10^{-7}$ in relative norm, and the three reconstruction methods agree to
+$\le10^{-5}$ (Tikhonov, TV) and $3\times10^{-4}$ (PnP) with identical PSNR to three decimals. The randomized SVD
+recovers the first 400 singular values to within $10^{-4}\,s_1$ and the same 465-dimensional well-determined subspace
+(319 weakly determined directions) as the dense SVD, and the resulting strong/weak error split agrees with the dense one to within $1\%$ of the error norm.
+At this size the dense implementation is much faster for the iterative solvers (Table~\ref{tab:mf}), since the adjoint is
+evaluated by differentiation and TV needs about $3\times10^{3}$ forward--adjoint pairs per image; PnP is only 1.2 times slower
+because the denoiser dominates its cost. The matrix-free operator is therefore a requirement for larger images, where the dense matrix cannot be stored, rather than an
+optimisation at 28$\times$28.
+ 
+\begin{table}[htbp]
+\centering\small\setlength{\tabcolsep}{4pt}
+\caption{Dense versus matrix-free pipeline (200 images, GPU). Rel.\ diff.: relative difference between the two reconstructions.
+Peak GPU memory for the whole comparison: 184\,MB.}\label{tab:mf}
+\begin{tabular}{lcccc}
+\toprule
+Method & Rel.\ diff. & PSNR (dense = MF) & Time dense (s) & Time MF (s)\\
+\midrule
+Tikhonov & $4.6\times10^{-6}$ & 16.36 & 0.08 & 0.26\\
+TV-ADMM  & $9.7\times10^{-6}$ & 19.01 & 0.16 & 7.50\\
+PnP ($k=25$) & $2.8\times10^{-4}$ & 23.10 & 0.76 & 0.94\\
+\bottomrule
+\end{tabular}
+\end{table}
+ 
+\subsection{E12: Poisson dose sweep}\label{sec:dose-results}
+Table~\ref{tab:dose} and Figure~\ref{fig:dose} give the PnP--TV difference over the dose range (200 test images per set; the
+Shepp--Logan phantom is one image with one noise draw per dose, so it has no interval). The qualitative picture of
+Stage~1 is reproduced.
+ 
+\emph{Prior-matched data.} On MNIST the learned prior beats TV at every dose, by $+3.7$\,dB at $I_0=100$--$300$ (effective $\sigma\approx0.03$--$0.06$), against $+3.84$\,dB at Gaussian $\sigma=0.05$,
+and for 99--100\% of the images at $I_0\ge100$. The advantage shrinks at both ends of the dose range, to $+0.8$\,dB at $I_0=10$, in line with the Gaussian result at $\sigma=0.2$
+($+0.97$\,dB). EMNIST keeps a smaller advantage ($+0.6$ to $+1.8$\,dB).
+ 
+\emph{Shifted data.} The MNIST-trained prior is below TV on Fashion-MNIST ($-2.0$ to $-3.1$\,dB; PnP wins on only 6--14\% of the images)
+and on the phantom ($-4.4$ to $-6.1$\,dB), as in Stage~1 ($-3.10$ and $-4.33$\,dB). The share of the error in the complement of the well-determined subspace is $0.68$--$0.99$ of TV's on MNIST but $1.04$--$1.19$ on Fashion-MNIST
+and $1.73$--$1.79$ on the phantom (for $I_0\le300$), so the mismatch error again sits partly in the weakly determined directions. These ratios are less favourable to PnP than the
+Stage~1 values and are not directly comparable, since the noise model, the tuned settings and the subspace definition differ.
+ 
+\emph{Weighted data term.} Using the Poisson weights in PnP gave no consistent benefit: the weighted variant was $0.14$--$0.59$\,dB below the unweighted one in 13 of the 15 non-phantom
+cells, and above it in two (EMNIST and Fashion-MNIST at $I_0=300$), where the tuned $(\sigma_d,k)$ differed. We therefore report the unweighted scheme.
+ 
+\begin{table}[htbp]
+\centering\small\setlength{\tabcolsep}{4pt}
+\caption{PnP$-$TV PSNR difference (dB, mean $\pm$ standard error of the paired difference over 200 images) by photon count $I_0$, with the corresponding
+effective sinogram noise standard deviation; and the ratio of PnP's to TV's reconstruction error in the complement of the well-determined subspace (in brackets). Phantom: one image.}\label{tab:dose}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lccccc}
+\toprule
+$I_0$ (photons/ray) & 1000 & 300 & 100 & 30 & 10\\
+effective $\sigma$ & 0.018 & 0.032 & 0.056 & 0.106 & 0.198\\
+\midrule
+MNIST (train dist.) & $+2.87\pm.07$ (0.70) & $+3.68\pm.08$ (0.68) & $+3.65\pm.08$ (0.71) & $+2.39\pm.12$ (0.88) & $+0.82\pm.12$ (0.99)\\
+EMNIST              & $+1.40\pm.09$ (0.75) & $+1.59\pm.08$ (0.83) & $+1.82\pm.08$ (0.86) & $+0.77\pm.11$ (1.02) & $+0.62\pm.10$ (1.00)\\
+Fashion-MNIST       & $-2.45\pm.13$ (1.04) & $-3.05\pm.16$ (1.18) & $-2.74\pm.16$ (1.18) & $-3.01\pm.14$ (1.19) & $-1.98\pm.13$ (1.07)\\
+Shepp--Logan        & $-4.41$ (0.90) & $-6.05$ (1.79) & $-5.05$ (1.73) & $-5.49$ (1.77) & $-4.75$ (1.75)\\
+\bottomrule
+\end{tabular}}
+\end{table}
+ 
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\linewidth]{figures/dose_sweep.png}
+\caption{PSNR versus photon count for FBP, Tikhonov, TV, PnP and the Poisson-weighted PnP on the four test sets (MNIST-trained denoiser,
+hyperparameters tuned on MNIST validation images at each dose).}\label{fig:dose}
+\end{figure}
+ 
+\subsection{E13: Lesion insertion under Poisson noise}\label{sec:lesion-poisson}
+We repeated the lesion experiment (Section~\ref{sec:lesion}; same lesions, observer, locations and validity filter; three denoisers per prior, 200 images per set) with
+Poisson data at $I_0=100$ and $I_0=30$ and the matrix-free operator, tuning each method on its prior's own validation distribution
+(Table~\ref{tab:lesion-poisson}, Figure~\ref{fig:lesion-poisson}).
+ 
+\emph{Erasure persists.} The paired AUC of PnP is below TV's in all four prior/test-set combinations and at both doses (differences of $-0.01$ to $-0.28$ at $I_0=100$, with one tie at $1.0$ for the largest high-contrast lesion, and $-0.02$ to $-0.19$ at $I_0=30$). For the MNIST prior on MNIST ($\sigma_l=0.75$, $c=0.5$) the paired AUC is $0.60$ against $0.89$ for TV and the retention is $0.29$ against $0.60$ at $I_0=100$,
+which reproduces the Gaussian-noise values of Stage~1 ($0.69$ vs.\ $0.91$; $0.28$ vs.\ $0.59$), although PnP is $3.7$\,dB better in PSNR on the same images. At $I_0=30$ the gap narrows
+($0.63$ vs.\ $0.77$) because TV degrades faster.
+ 
+\emph{Invention under mismatch persists.} For the MNIST-trained prior on Fashion-MNIST, PnP produces more false lesions than TV for lesions with $\sigma_l\ge0.75$ in 11 of the 12 dose/lesion-type cells, by factors of $1.7$--$5.5$ ($0.25$--$0.70$ against $0.06$--$0.28$ per image at $I_0=100$; the exception is $0.25$ against $0.28$). The matched Fashion-trained prior, on its own data and on MNIST, stays at $\le0.09$ false lesions per image. Retention above that of TV
+for the mismatched prior should not be read as fidelity, since invented contrast contributes to it.
+ 
+\emph{New at the lower dose: in-distribution invention.} For the MNIST prior on MNIST at $I_0=30$, PnP produces $0.058$--$0.073$ false lesions per image for the four lesion types with $0.75\le\sigma_l\le1.25$, against $0.000$--$0.035$ for TV,
+whereas at $I_0=100$ it produces at most $0.01$ for any type. At high noise the in-distribution prior therefore starts to create lesion-like structure as well as to erase it, although at a rate far below that under mismatch.
+ 
+\emph{TV has a failure of its own.} For the smallest low-contrast lesion at $I_0=100$ the TV reconstruction contains $0.63$ false lesions per image (noise blobs), against $0.01$ for PnP. The statement that PnP creates more false lesions than TV under mismatch therefore applies to lesions of $\sigma_l\ge0.75$\,px, and under a matched prior is not supported at all.
+ 
+Uncertainty is limited by the design: the error bars in Figure~\ref{fig:lesion-poisson} show the variation over three denoisers only, TV is a single run, and with about 170 valid lesions per cell the sampling error of a paired AUC is of the order of $\pm0.03$, so differences below that, such as the ties for the
+largest lesions, do not separate the methods. A tercile analysis of PnP's paired AUC by lesion observability showed a decrease with observability on MNIST images and no trend on Fashion-MNIST images; since it depends on the image set it is
+likely to reflect the background around the lesion rather than the operator, and we do not interpret it.
+ 
+\begin{table}[htbp]
+\centering\small\setlength{\tabcolsep}{3pt}
+\caption{Lesion insertion under Poisson noise, mean over three denoisers per prior (200 test images; 20 angles; bicubic data), for two of the eight lesion types.
+pAUC: paired AUC; Ret.: retention; FL: false lesions per lesion-absent image. Each method is tuned on its own prior's validation distribution at the given dose.}\label{tab:lesion-poisson}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{llcccccccccccc}
+\toprule
+ & & \multicolumn{6}{c}{$I_0=100$} & \multicolumn{6}{c}{$I_0=30$}\\
+\cmidrule(lr){3-8}\cmidrule(lr){9-14}
+ & & \multicolumn{2}{c}{pAUC} & \multicolumn{2}{c}{Ret.} & \multicolumn{2}{c}{FL} & \multicolumn{2}{c}{pAUC} & \multicolumn{2}{c}{Ret.} & \multicolumn{2}{c}{FL}\\
+\cmidrule(lr){3-4}\cmidrule(lr){5-6}\cmidrule(lr){7-8}\cmidrule(lr){9-10}\cmidrule(lr){11-12}\cmidrule(lr){13-14}
+Prior $\to$ test set & $\sigma_l/c$ & TV & PnP & TV & PnP & TV & PnP & TV & PnP & TV & PnP & TV & PnP\\
+\midrule
+MNIST $\to$ MNIST    & 0.75/0.5  & .89 & .60 & .60 & .29 & .010 & .007 & .77 & .63 & .48 & .34 & .005 & .067\\
+                     & 1.25/0.25 & .88 & .60 & .60 & .27 & .020 & .007 & .75 & .65 & .46 & .46 & .005 & .068\\
+MNIST $\to$ Fashion  & 0.75/0.5  & .81 & .72 & .64 & .84 & .240 & .443 & .73 & .63 & .42 & .57 & .230 & .518\\
+                     & 1.25/0.25 & .84 & .72 & .65 & .84 & .255 & .438 & .71 & .61 & .42 & .54 & .225 & .518\\
+Fashion $\to$ Fashion & 0.75/0.5 & .79 & .64 & .46 & .23 & .075 & .020 & .69 & .58 & .25 & .11 & .020 & .038\\
+                     & 1.25/0.25 & .85 & .71 & .48 & .25 & .075 & .020 & .68 & .56 & .27 & .16 & .040 & .038\\
+Fashion $\to$ MNIST  & 0.75/0.5  & .88 & .66 & .48 & .31 & .000 & .003 & .78 & .64 & .33 & .27 & .000 & .007\\
+                     & 1.25/0.25 & .89 & .66 & .49 & .33 & .000 & .003 & .78 & .65 & .34 & .34 & .000 & .007\\
+\bottomrule
+\end{tabular}}
+\end{table}
+ 
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\linewidth]{figures/step5_summary_lesions_I100.png}\\[2pt]
+\includegraphics[width=\linewidth]{figures/step5_summary_lesions_I30.png}
+\caption{Paired detection AUC (top rows) and false lesions per lesion-absent image (bottom rows) under Poisson noise, $I_0=100$ (upper panel) and $I_0=30$ (lower panel). Bars: mean over three
+denoisers; error bars: s.d.\ over seeds.}\label{fig:lesion-poisson}
+\end{figure}
+
+
 
 
 \section{Discussion}
 \label{sec:discussion}
 
-Six findings emerge from this study.
+Seven findings emerge from this study.
  
 First, the learned prior's accuracy advantage over TV is conditional rather than universal. It is large and
 significant at moderate noise and for moderate undersampling ($\approx+3.9$\,dB at $\sigma=0.05$ with 20--40 angles),
@@ -831,7 +992,11 @@ results are consistent with broader findings on instabilities in learned reconst
 support the view that in-distribution accuracy alone is an insufficient basis for adopting a learned prior; mismatch,
 shift, seed and task-based evaluation should be a standard part of such studies, not an optional addendum.
  
-
+Seventh, the conclusions do not depend on the two simplifications of the early experiments. Replacing the dense
+matrix by a matrix-free projector with an exact adjoint changes no reconstruction beyond $3\times10^{-4}$, and replacing additive Gaussian noise by Poisson
+noise leaves the picture unchanged: the learned prior's gain over TV peaks at the same effective noise level and is lost under shift, the lesion deficit
+of the PSNR-tuned prior in distribution is the same, and invention under mismatch is the same. The one new effect, a small rate of in-distribution false lesions at high noise, is a reminder that
+the failure mode of a learned prior moves with the noise level, so conclusions about hallucination should be stated for an operating regime. The weighted Poisson data term did not help, so the Gaussian approximation is adequate in this setting.
 
 
 \section{Conclusion}
@@ -846,8 +1011,7 @@ distribution beats TV on it, and the mismatched prior fills the weakly determine
 a task-based evaluation, the PSNR-tuned PnP reconstruction attenuates small lesions in distribution and invents lesion-like blobs under
 mismatch; re-tuning recovers TV-level detection only by giving up the PSNR advantage or by increasing false structure, except for a matched
 prior. The iteration used here lacks a stable, accurate fixed point, so early stopping acts as a regularizer. Future work should extend
-this study to larger, clinical-resolution data such as LoDoPaB-CT~\cite{leuschner2021} with patient-disjoint splits, matrix-free operators
-and Poisson noise, and to provably convergent PnP variants and learned priors trained on diverse anatomy.
+this study to larger, clinical-resolution data such as LoDoPaB-CT~\cite{leuschner2021} with patient-disjoint splits, patient-disjoint splits and clinical dose and geometry shifts (the matrix-free operator and Poisson model are now in place), and to provably convergent PnP variants and learned priors trained on diverse anatomy.
  
 
 \section*{Limitations}
@@ -864,13 +1028,20 @@ false-lesion threshold that is a modelling choice, so false-lesion rates are mea
 the operating-point study uses one denoiser per prior, two lesion types and a coarse grid. Only two training distributions were
 compared, so the explanation of the asymmetric transfer between them remains a hypothesis. The PnP scheme has no convergence guarantee,
 and only moderate forward-model mismatches (up to $4^\circ$) were evaluated.
- 
+ The Poisson study uses a single attenuation scale ($\mu=2$), which keeps the signal dependence of the noise mild, a single angle count,
+and one MNIST-trained denoiser in the dose sweep, so the shift results of E12 carry no seed uncertainty; its Shepp--Logan result is one image and one noise draw per dose.
+The lesion study under Poisson noise inherits the limitations of E9, its TV baseline is a single run, and its observability analysis is exploratory and image-set dependent.
+The matrix-free operator was validated only against the dense operator at $28\times28$, not at clinical size, where the cost of the matrix-free TV solver will have to be reduced.
+
+
+
 \section*{Reproducibility}
 Code, trained models, all raw result files and figures are available at
 \url{https://github.com/AboOraig/learned-regularization}. The experiments of this version are run, in order, by
 \texttt{run\_nullspace.py} (E6, E7), \texttt{run\_spectral.py} (iteration and spectral analysis), \texttt{run\_step4.py} and
 \texttt{summarize\_step4.py} (E8), \texttt{run\_lesions.py} and \texttt{summarize\_step5.py} (E9), and \texttt{run\_oppoint.py} (E10);
-the unit tests are run with \texttt{python -m pytest tests}.
+the unit tests are run with \texttt{python -m pytest tests};
+\texttt{run\_stage2.py} (E11, E12) and \texttt{run\_lesions\_poisson.py} with \texttt{summarize\_step5.py} (E13); the unit tests (44 in total) run with \texttt{python -m pytest tests}.
 
 
 

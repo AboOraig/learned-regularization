@@ -118,4 +118,16 @@ for full discussion.
 | run_lesions.py + summarize_step5.py | lesion-insertion test (paired AUC, retention, false lesions) | step5/step5_summary.csv/.png, lesion_*_examples_*.png |
 | run_oppoint.py | operating-point study (PSNR vs lesion detectability) | step5b/oppoint_*.csv/.png |
 
-Tests: `python -m pytest tests -q` (34 tests).
+## Stage 2 extensions (branch stage2-matrix-free)
+ 
+| File | What it does | Main outputs (results/) |
+|---|---|---|
+| src/radon_mf.py | `MatrixFreeRadon`: matrix-free projector, exact adjoint (autograd transpose), Lipschitz estimate, FBP; matches the dense `RadonOperator` to ~3e-7 | - |
+| src/mf_solvers.py | CG Tikhonov, CG-based TV-ADMM, Poisson (Beer-Lambert) sinograms, Poisson-weighted PnP, randomized SVD, strong/weak error split | - |
+| src/mf_tune.py | tuning and reconstruction with the matrix-free operator | - |
+| run_stage2.py --exp equiv | dense vs matrix-free comparison (accuracy, time, GPU memory) | console |
+| run_stage2.py --exp dose | Poisson dose sweep I0 = 1000...10 photons/ray, 4 test sets, 5 methods | stage2/dose_sweep.csv/.png |
+| run_lesions_poisson.py --I0 100 --out results/stage2/lesions_I100 | lesion-insertion test under Poisson noise (also --I0 30) | stage2/lesions_I*/lesion_*_metrics.csv |
+| summarize_step5.py --dir results/stage2/lesions_I100 | aggregates the lesion results | step5_summary.csv/.png in that folder |
+ 
+Tests: `python -m pytest tests -q` (44 tests).
