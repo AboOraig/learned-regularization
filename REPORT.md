@@ -30,6 +30,10 @@ reported as mean and 95% CI over test images, plus a paired Wilcoxon
 signed-rank test between PnP and TV on matched images and noise
 realizations.
 
+### Method
+- `MatrixFreeRadon` never forms A: embed the 28x28 image in a 40x40 canvas, rotate by each angle (bilinear, about the pixel used by skimage), sum along detector rows. The adjoint is the exact transpose, obtained by autograd. Tikhonov and TV use conjugate gradients; subspaces use a randomized SVD (forward and adjoint products only).
+- Poisson model: counts N ~ Poisson(I0 exp(-mu * A x)), data = -log(max(N,1)/I0)/mu, mu = 2. Data are generated on the finer grid (bicubic, factor 5). I0 = 1000, 300, 100, 30, 10 gives an effective sinogram noise std of 0.018, 0.032, 0.056, 0.106, 0.198. Hyperparameters are tuned per dose on 100 held-out validation images and frozen for all test sets.
+
 ## 2. In-distribution accuracy (E1: noise, E2: angles)
 
 TV is a strong baseline on MNIST because digits are close to piecewise
@@ -195,7 +199,36 @@ false-lesion rate; lesion-tuned point 0.5 dB below TV with 60x its false-lesion 
 constrained point keeps +1.0 dB over TV with AUC within 0.02-0.03 of TV's. Under shift, operating points chosen in
 distribution do not protect (2.1-2.8 dB below TV, 0.40-0.51 false lesions/image).
 
-## 11. Limitations
+## 11. Equivalence with the dense pipeline (200 images, GPU) (E11)
+ 
+| Method | rel. difference | PSNR | time dense (s) | time matrix-free (s) |
+|---|---|---|---|---|
+| Tikhonov | 4.6e-6 | 16.36 | 0.08 | 0.26 |
+| TV-ADMM | 9.7e-6 | 19.01 | 0.16 | 7.50 |
+| PnP (k=25) | 2.8e-4 | 23.10 | 0.76 | 0.94 |
+ 
+Forward difference 2.9e-7; peak GPU memory 184 MB. The randomized SVD finds the same 465-dimensional strong subspace as the dense SVD. At 28x28 the dense operator is faster; the matrix-free one is needed for larger images.
+ 
+## 12. Poisson dose sweep, PnP - TV (dB, mean +/- s.e. of the paired difference, 200 images) (E12)
+ 
+| I0 (photons/ray) | 1000 | 300 | 100 | 30 | 10 |
+|---|---|---|---|---|---|
+| effective sigma | 0.018 | 0.032 | 0.056 | 0.106 | 0.198 |
+| MNIST | +2.87 +/- 0.07 | +3.68 +/- 0.08 | +3.65 +/- 0.08 | +2.39 +/- 0.12 | +0.82 +/- 0.12 |
+| EMNIST | +1.40 +/- 0.09 | +1.59 +/- 0.08 | +1.82 +/- 0.08 | +0.77 +/- 0.11 | +0.62 +/- 0.10 |
+| Fashion-MNIST | -2.45 +/- 0.13 | -3.05 +/- 0.16 | -2.74 +/- 0.16 | -3.01 +/- 0.14 | -1.98 +/- 0.13 |
+| Shepp-Logan (1 image) | -4.41 | -6.05 | -5.05 | -5.49 | -4.75 |
+ 
+Same ranking and the same reversal under shift as with Gaussian noise (Stage 1: MNIST +3.84, EMNIST +1.79, Fashion -3.10, Shepp -4.33 dB at sigma = 0.05). The Poisson-weighted PnP variant was 0.14-0.59 dB below the unweighted one in 13 of 15 non-phantom cells (and above it in two cells where the tuned parameters differed): no consistent benefit.
+ 
+## 13. Lesion insertion under Poisson noise (3 denoisers per prior, 200 images per set) (E13)
+- Erasure persists: PnP paired AUC is below TV in all four prior/test-set combinations at both doses (-0.01 to -0.28 at I0 = 100). MNIST prior on MNIST, sigma_l = 0.75, c = 0.5: paired AUC 0.89 (TV) vs 0.60 (PnP), retention 0.60 vs 0.29 at I0 = 100 (Stage 1: 0.91 vs 0.69; 0.59 vs 0.28), while PnP is 3.7 dB better in PSNR.
+- Invention under mismatch persists: MNIST prior on Fashion-MNIST gives more false lesions than TV for lesions with sigma_l >= 0.75 in 11 of 12 dose/type cells (factor 1.7-5.5; 0.25-0.70 vs 0.06-0.28 per image at I0 = 100). Matched priors stay at <= 0.09 false lesions per image.
+- New at I0 = 30: the MNIST prior on MNIST makes 0.058-0.073 false lesions per image for the four types with 0.75 <= sigma_l <= 1.25 (TV 0.000-0.035); at I0 = 100 it makes at most 0.01.
+- TV has noise blobs of its own on the smallest low-contrast lesion at I0 = 100 (0.63 false lesions per image vs 0.01 for PnP).
+- Uncertainty: error bars show only the 3 denoiser seeds; TV is a single run; the sampling error of a paired AUC with ~170 lesions is about +/-0.03. The observability-tercile pattern (PnP AUC falls with observability on MNIST images only) is exploratory and not interpreted.
+
+## 14. Limitations
 
 - Trained and evaluated at small scale (28x28 MNIST-derived images);
   trends may not transfer directly to natural-image or clinical CT
@@ -210,4 +243,7 @@ distribution do not protect (2.1-2.8 dB below TV, 0.40-0.51 false lesions/image)
 - Only two training distributions were compared; the asymmetric transfer is a hypothesis.
 - Mismatch levels tested (angle error up to 4 degrees) are moderate;
   larger or structurally different mismatches were not tested.
+- One attenuation scale (mu = 2), one angle count; the dose sweep uses one MNIST-trained denoiser, so its shift results have no seed uncertainty; Shepp-Logan is one image and one noise draw per dose.
+- The lesion study inherits the limitations of E9 (bright Gaussian blobs, location-known observer, threshold-defined false lesions).
+- The matrix-free operator was validated only at 28x28; the matrix-free TV solver is ~47x slower than the dense one at this size and will need work at clinical size.
 
