@@ -1,0 +1,24 @@
+{
+ "validation_n": 3522,
+ "test_n": 3553,
+ "train_patients": 632,
+ "validation_patients": 60,
+ "test_patients": 60,
+ "overlap_train_validation": 0,
+ "overlap_train_test": 0,
+ "overlap_validation_test": 0,
+ "best_convention": {
+  "sign": 1.0,
+  "flip_det": false,
+  "half_step_offset": 0.5,
+  "transpose_image": true,
+  "fitted_scale": 1.004418134689331,
+  "rel_residual": 0.03832089900970459,
+  "correlation": 0.9978495240211487
+ },
+ "fbp_psnr_slice0": 21.838414508083343,
+ "recommended_pixel_size": 0.0007214052901083594,
+ "time_fa_K60": 0.06219339370727539,
+ "time_fa_K180": 0.19559741020202637,
+ "time_fa_K1000": 1.1044528484344482
+}
