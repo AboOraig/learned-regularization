@@ -79,11 +79,18 @@ class ParallelBeamOperator:
             v = self.normal(v); v = v / v.norm()
         return float((self.normal(v) * v).sum())
 
-    def fbp(self, y):
-        """Filtered back-projection for angles spread uniformly over [0, 180): ramp filter in cycles/length, then
-        x = (pi/K)(1/pixel_size) A^T(filtered).  Returns (B, n)."""
+    def fbp(self, y, filter_name="ramp", freq_scale=1.0):
+        """Filtered back-projection for angles spread uniformly over [0, 180): filter in cycles/length, then
+        x = (pi/K)(1/pixel_size) A^T(filtered).  filter_name: 'ramp' or 'hann' (ramp x Hann window, cut-off
+        freq_scale x Nyquist).  Returns (B, n)."""
         yy = y.reshape(-1, self.K, self.n_det)
         npad = 1 << int(math.ceil(math.log2(2 * self.n_det)))
-        w = torch.fft.fftfreq(npad, d=self.pixel_size).abs().to(y.device)
+        f = torch.fft.fftfreq(npad, d=self.pixel_size).to(y.device)
+        w = f.abs()
+        if filter_name == "hann":
+            fc = freq_scale / (2.0 * self.pixel_size)
+            w = w * torch.where(f.abs() < fc, 0.5 * (1 + torch.cos(math.pi * f / fc)), torch.zeros_like(f))
+        elif filter_name != "ramp":
+            raise ValueError("filter_name must be 'ramp' or 'hann'")
         filt = torch.fft.ifft(torch.fft.fft(yy, n=npad, dim=-1) * w, dim=-1).real[..., :self.n_det]
         return self.adjoint(filt.reshape(len(yy), -1)) * (math.pi / (self.K * self.pixel_size))

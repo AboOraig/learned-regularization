@@ -83,3 +83,50 @@ class LoDoPaB:
         for h, _ in self._open.values():
             h.close()
         self._open = {}
+
+
+# ------------------------------------------------------------------ conventions found in step 1 (geometry check against the real observations)
+# rotation sign +1, no detector flip, stored image transposed, angles at the mid-points of 1000 cells over [0, 180) deg,
+# pixel size = 0.26 m / 362 x fitted scale 1.0044
+PIXEL_SIZE = 0.26 / 362 * 1.0044
+
+
+def make_operator(n_angles=1000, device="cpu", **kw):
+    """Parallel-beam operator for LoDoPaB with n_angles of the 1000 angles (evenly spaced subset).
+    Returns (operator, indices of the used angles in the 1000-angle observation)."""
+    from .radon_pb import ParallelBeamOperator
+    idx = np.round(np.linspace(0, N_ANGLES, n_angles, endpoint=False)).astype(int)
+    ang = (idx + 0.5) * 180.0 / N_ANGLES
+    op = ParallelBeamOperator(IMG, N_DET, angles_deg=ang, pixel_size=PIXEL_SIZE, sign=1.0, flip_det=False, device=device, **kw)
+    return op, idx
+
+
+def gt_oriented(ds, idx):
+    """Ground truth in the operator's orientation, flattened: (len(idx), 362*362) float32."""
+    return np.ascontiguousarray(ds.gt(idx).transpose(0, 2, 1)).reshape(len(idx), -1)
+
+
+def one_per_patient(ds, n, seed=0):
+    """Indices of n slices, one random slice from each of n randomly chosen patients (independent units for statistics)."""
+    rng = np.random.default_rng(seed)
+    pats = np.unique(ds.patient_ids[:len(ds)])
+    rng.shuffle(pats)
+    out = []
+    for p in pats[:n]:
+        out.append(int(rng.choice(np.where(ds.patient_ids[:len(ds)] == p)[0])))
+    return np.asarray(out)
+
+
+def extract_partial(root, stem="ground_truth_train", n_files=70):
+    """Extract only the first n_files hdf5 members of root/<stem>.zip into root/<stem>/."""
+    z = os.path.join(root, stem + ".zip")
+    dest = os.path.join(root, stem)
+    with zipfile.ZipFile(z) as zf:
+        names = sorted([n for n in zf.namelist() if n.endswith(".hdf5")],
+                       key=lambda n: int(re.findall(r"_(\d+)\.hdf5$", n)[0]))[:n_files]
+        for k, n in enumerate(names):
+            if not os.path.exists(os.path.join(dest, n)):
+                zf.extract(n, dest)
+            if (k + 1) % 10 == 0:
+                print(f"  extracted {k + 1}/{len(names)}", flush=True)
+    return dest, len(names)
