@@ -75,7 +75,7 @@ def nominal_response(sigma_l, contrast, size=SIZE):
     """Response of the contrast kernel to a lesion alone, on an empty background (used to set the false-lesion threshold)."""
     rho = lesion_rho(sigma_l); c = size // 2
     les = contrast * gaussian_lesion(torch.tensor([[c, c]]), sigma_l, size)
-    return contrast_at(les, rho, torch.tensor([[c, c]])).item()
+    return contrast_at(les, rho, torch.tensor([[c, c]]), size).item()
 
 
 def count_false_lesions(recon, truth, rho, theta, nms=5, support_radius=2, support_frac=0.5, size=SIZE):
