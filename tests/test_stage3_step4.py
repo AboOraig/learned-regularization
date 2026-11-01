@@ -77,3 +77,23 @@ def test_shapes_phantom():
     a, b = shapes_phantom(0), shapes_phantom(1)
     assert a.shape == (362 * 362,) and 0 <= a.min() and a.max() <= 1 and not np.array_equal(a, b)
     assert np.array_equal(a, shapes_phantom(0)) and a.std() > 0.1
+
+
+def test_paired_diff_and_unsupported_map():
+    rng = np.random.default_rng(0); S, M = 30, 4
+    R = {"valid|2|0.06": np.ones((S, M), bool), "psnr|A": np.zeros(S), "psnr|B": np.zeros(S)}
+    R["t0|2|0.06|A"] = rng.normal(size=(S, M)); R["t0|2|0.06|B"] = R["t0|2|0.06|A"].copy()
+    R["t1|2|0.06|A"] = R["t0|2|0.06|A"] + 3.0; R["t1|2|0.06|B"] = R["t0|2|0.06|B"] + 0.0
+    R["fl|2|0.06|A"] = np.full(S, 1.0); R["fl|2|0.06|B"] = np.full(S, 3.0)
+    d, lo, hi = C.paired_diff(R, [(2.0, 0.06)], "A", "B", "auc", 200)
+    assert d > 0.4 and lo > 0.3
+    d, lo, hi = C.paired_diff(R, [(2.0, 0.06)], "A", "B", "fl", 200)
+    assert d == -2.0 and lo == hi == -2.0
+    S_, rho = 64, L.lesion_rho(2.0)
+    x = torch.zeros(1, S_ * S_) + 0.2
+    inv = C.insert_multi(x, torch.tensor([[[30, 30]]]), torch.tensor([[True]]), 2.0, 0.1, size=S_)
+    nom = L.nominal_response(2.0, 0.1, S_)
+    Rm, un = C.unsupported_map(inv, x, rho, nom, size=S_)
+    assert int(((Rm >= 0.5 * nom) & un).sum()) == 1 and int(((Rm >= 1.5 * nom) & un).sum()) == 0
+    Rm, un = C.unsupported_map(inv, inv, rho, nom, size=S_)
+    assert int(((Rm >= 0.5 * nom) & un).sum()) == 0

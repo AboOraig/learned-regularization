@@ -75,3 +75,31 @@ def cluster_boot(fn, S, n_boot=2000, seed=0):
     rng = np.random.default_rng(seed)
     v = [fn(rng.integers(0, S, S)) for _ in range(n_boot)]
     return float(np.nanpercentile(v, 2.5)), float(np.nanpercentile(v, 97.5))
+
+
+# ---------------------------------------------------------------- step 4b helpers
+def unsupported_map(recon, truth, rho, nom, nms=5, support_radius=2, support_frac=0.5, size=SIZE):
+    """Local-contrast map R of `recon`, mask of its local maxima (NMS window) that have NO support in the truth, where support is
+    defined as in L.count_false_lesions at the base threshold 0.5*nom (kept fixed while the candidate threshold is swept)."""
+    import torch.nn.functional as F
+    R, T = L.contrast_map(recon, rho, size), L.contrast_map(truth, rho, size)
+    pool = lambda M, k: F.max_pool2d(M[:, None], k, 1, k // 2)[:, 0]
+    localmax = R == pool(R, nms)
+    support = pool(T, 2 * support_radius + 1) >= support_frac * 0.5 * nom
+    return R, localmax & ~support
+
+
+def _stat(R, s, c, m, kind, idx):
+    if kind == "auc":
+        return cluster_paired_auc(R[f"t1|{s:g}|{c:g}|{m}"], R[f"t0|{s:g}|{c:g}|{m}"], R[f"valid|{s:g}|{c:g}"], idx)
+    return float(R[f"fl|{s:g}|{c:g}|{m}"][idx].mean())
+
+
+def paired_diff(R, types, mA, mB, kind, n_boot=2000, seed=0):
+    """mA - mB on the SAME bootstrap resamples of slices (paired). `types` = list of (sigma, contrast); several types are averaged with
+    equal weight. Returns (difference, lo, hi) of the 95% percentile interval."""
+    S = len(R[f"psnr|{mA}"])
+    stat = lambda idx, m: float(np.nanmean([_stat(R, s, c, m, kind, idx) for s, c in types]))
+    fn = lambda idx: stat(idx, mA) - stat(idx, mB)
+    lo, hi = cluster_boot(fn, S, n_boot, seed)
+    return fn(np.arange(S)), lo, hi
