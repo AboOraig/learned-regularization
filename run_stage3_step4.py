@@ -11,7 +11,7 @@ Reported per image set / method / lesion type: location-known paired AUC, retent
 intervals over slices) and PSNR on the lesion-free arm.
 Usage: python run_stage3_step4.py --doses 1            (then --doses 0.25)
 Outputs (results/stage3): step4_lesion_summary.csv, step4_perslice.npz-like files step4_<set>_dose<f>.npz (resumable)"""
-import argparse, os, time, platform
+import argparse, os, time, platform, json
 import numpy as np, pandas as pd, torch
 from src.lodopab import LoDoPaB, make_operator, gt_oriented, one_per_patient, IMG
 from src.lodopab_noise import thin_obs
@@ -34,6 +34,7 @@ p.add_argument("--tv_iters", type=int, default=150)
 p.add_argument("--tv_lams", default="3e-3,1e-2,3e-2"); p.add_argument("--hann", default="0.16,0.2,0.3,0.4")
 p.add_argument("--sd_grid", default="0.02,0.03,0.05"); p.add_argument("--ck", default="4,8,12,20,30")
 p.add_argument("--n_boot", type=int, default=2000); p.add_argument("--seed", type=int, default=0)
+p.add_argument("--auto_extend", type=int, default=0, help="if a tuned parameter lands on the edge of its grid, add one more grid point in that direction, up to this many times")
 p.add_argument("--fidelity", type=int, default=1, help="also reconstruct REAL observations of the same ct slices with TV (simulator check)")
 a = p.parse_args()
 dev = "cuda" if torch.cuda.is_available() else "cpu"
@@ -57,25 +58,48 @@ NOM = {(s, c): L.nominal_response(s, c, IMG) for s, c in TYPES}
 dmin = 10 * max(s for s, _ in TYPES) + 4
 
 
+def climb(grid, evalfn, down, up, rounds, label):
+    """evalfn(v) -> score (cached by the caller). Evaluates the grid; while the best value is at an edge and rounds remain, adds
+    down(best) / up(best) as a new grid point. Returns (best value, {value: score})."""
+    grid = sorted(grid); sc = {}
+    for _ in range(rounds + 1):
+        for v in grid:
+            if v not in sc:
+                sc[v] = evalfn(v)
+        b = max(sc, key=sc.get)
+        if rounds == 0 or b not in (min(sc), max(sc)):
+            break
+        nxt = down(b) if b == min(sc) else up(b)
+        if nxt is None or nxt in sc:
+            break
+        grid = sorted(set(grid) | {nxt}); rounds -= 1
+    b = max(sc, key=sc.get)
+    print(f"{label}: " + ", ".join(f"{v:g}: {sc[v]:.2f}" for v in sorted(sc)) + f" => {b:g}" + edge(b, sorted(sc)), flush=True)
+    return b, sc
+
+
 def tune(f):
     y = thin_obs(OBSv, f, seed=a.seed + 11)[:, ai, :].reshape(len(iv), -1).to(dev)
-    sc = {h: psnr(op.fbp(y, "hann", h), GTv).mean() for h in hanns}; hb = max(sc, key=sc.get)
-    print("Hann -> val PSNR: " + ", ".join(f"{h:g}: {v:.2f}" for h, v in sc.items()) + f" => {hb:g}" + edge(hb, hanns), flush=True)
+    R = a.auto_extend
+    hb, _ = climb(hanns, lambda h: psnr(op.fbp(y, "hann", h), GTv).mean(), lambda b: round(b * 0.75, 3), lambda b: round(b + 0.1, 3) if b < 0.9 else None, R, "Hann cut-off -> val PSNR")
     x0 = op.fbp(y, "hann", hb).clamp(0, 1)
-    tvv = {l: cat(lambda yy, xx: tv_pdhg(op, yy, l, a.tv_iters, xx, L_), y, x0) for l in lams}
-    ts = {l: psnr(v, GTv).mean() for l, v in tvv.items()}; lb = max(ts, key=ts.get)
-    print("TV lambda -> val PSNR: " + ", ".join(f"{l:g}: {v:.2f}" for l, v in ts.items()) + f" => {lb:g}" + edge(lb, lams), flush=True)
-    prm = {"hann": hb, "lam": lb}
+    tvv = {}
+    def ev_tv(l):
+        tvv[l] = cat(lambda yy, xx: tv_pdhg(op, yy, l, a.tv_iters, xx, L_), y, x0); return psnr(tvv[l], GTv).mean()
+    lb, _ = climb(lams, ev_tv, lambda b: b / 3, lambda b: b * 3, R, "TV lambda -> val PSNR")
+    ev_tl = lambda l: psnr(cat(lambda yy, xx: tv_pdhg(op, yy, l, 2 * a.tv_iters, xx, L_), y, x0), GTv).mean()
+    ll, _ = climb(lams + [lb], ev_tl, lambda b: b / 3, lambda b: b * 3, R, f"TV-long ({2 * a.tv_iters} it) lambda -> val PSNR")
+    prm = {"hann": hb, "lam": lb, "lam_long": ll}
     for name, init in (("const", x0), ("tvinit", tvv[lb])):
-        best = (-1, None)
-        for sd in SD:
+        best = {}
+        def ev_sd(sd):
             outs = [pnp_ct(op, y[b:b + 10], den, sd, eta, CK, init[b:b + 10]) for b in range(0, len(y), 10)]
-            for k in CK:
-                s_ = psnr(torch.cat([o[k] for o in outs]), GTv).mean()
-                if s_ > best[0]:
-                    best = (s_, (sd, k))
-        prm[name] = best[1]
-        print(f"PnP-{name}: val PSNR {best[0]:.2f} at sigma_d={best[1][0]:g}, k={best[1][1]}" + edge(best[1][0], SD) + edge(best[1][1], list(CK)), flush=True)
+            sc = {k: psnr(torch.cat([o[k] for o in outs]), GTv).mean() for k in CK}
+            best[sd] = max(sc, key=sc.get); return sc[best[sd]]
+        sdb, scs = climb(SD, ev_sd, lambda b: round(b / 1.6, 4), lambda b: round(b * 1.6, 4), R, f"PnP-{name}: sigma_d -> best val PSNR over k")
+        prm[name] = (sdb, best[sdb])
+        print(f"PnP-{name}: val PSNR {scs[sdb]:.2f} at sigma_d={sdb:g}, k={best[sdb]}" + edge(best[sdb], list(CK)), flush=True)
+    json.dump({k: (list(v) if isinstance(v, tuple) else v) for k, v in prm.items()}, open(f"{a.out}/step4_params_dose{f:g}.json", "w"))
     return prm
 
 
@@ -84,7 +108,7 @@ def recon_all(y, prm):
     tv = tv_pdhg(op, y, prm["lam"], a.tv_iters, x0, L_)
     sd, k = prm["const"]; pc = pnp_ct(op, y, den, sd, eta, (k,), x0)[k]
     sd, k = prm["tvinit"]; pt = pnp_ct(op, y, den, sd, eta, (k,), tv)[k]
-    return {"FBP-Hann": x0, "TV": tv, "TV-long": tv_pdhg(op, y, prm["lam"], 2 * a.tv_iters, x0, L_), "PnP-const": pc, "PnP-TVinit": pt}
+    return {"FBP-Hann": x0, "TV": tv, "TV-long": tv_pdhg(op, y, prm.get("lam_long", prm["lam"]), 2 * a.tv_iters, x0, L_), "PnP-const": pc, "PnP-TVinit": pt}
 
 
 def run_set(name, X, masks, f, prm):

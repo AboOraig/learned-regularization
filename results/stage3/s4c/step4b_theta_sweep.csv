@@ -1,0 +1,113 @@
+set,dose,sigma_l,contrast,theta_mult,method,false_per_img,lo,hi,n,kind
+ct,0.25,2.0,0.06,0.5,FBP-Hann,48.2,31.14875,69.07687499999999,40,absolute
+ct,0.25,2.0,0.06,0.5,TV,5.575,2.5,9.575,40,absolute
+ct,0.25,2.0,0.06,0.5,TV-long,4.875,2.5743750000000003,7.75,40,absolute
+ct,0.25,2.0,0.06,0.5,PnP-const,0.95,0.35,1.725,40,absolute
+ct,0.25,2.0,0.06,0.5,PnP-TVinit,3.3,1.65,5.25,40,absolute
+ct,0.25,2.0,0.06,0.5,PnP-const - TV,-4.625,-7.775,-2.125,40,paired_diff
+ct,0.25,2.0,0.06,0.5,PnP-TVinit - TV-long,-1.575,-2.725625,-0.675,40,paired_diff
+ct,0.25,2.0,0.06,0.75,FBP-Hann,16.525,7.775,27.101874999999993,40,absolute
+ct,0.25,2.0,0.06,0.75,TV,1.675,0.65,3.025,40,absolute
+ct,0.25,2.0,0.06,0.75,TV-long,1.725,0.824375,2.9,40,absolute
+ct,0.25,2.0,0.06,0.75,PnP-const,0.325,0.1,0.6006249999999965,40,absolute
+ct,0.25,2.0,0.06,0.75,PnP-TVinit,1.55,0.675,2.625,40,absolute
+ct,0.25,2.0,0.06,0.75,PnP-const - TV,-1.35,-2.525,-0.5,40,paired_diff
+ct,0.25,2.0,0.06,0.75,PnP-TVinit - TV-long,-0.175,-0.65,0.275,40,paired_diff
+ct,0.25,2.0,0.06,1.0,FBP-Hann,4.6,1.55,8.700624999999995,40,absolute
+ct,0.25,2.0,0.06,1.0,TV,0.65,0.225,1.175,40,absolute
+ct,0.25,2.0,0.06,1.0,TV-long,0.575,0.25,0.9756249999999965,40,absolute
+ct,0.25,2.0,0.06,1.0,PnP-const,0.15,0.0,0.35,40,absolute
+ct,0.25,2.0,0.06,1.0,PnP-TVinit,0.775,0.3,1.35,40,absolute
+ct,0.25,2.0,0.06,1.0,PnP-const - TV,-0.5,-0.925,-0.15,40,paired_diff
+ct,0.25,2.0,0.06,1.0,PnP-TVinit - TV-long,0.2,-0.075,0.55,40,paired_diff
+ct,0.25,2.0,0.06,1.5,FBP-Hann,0.225,0.0,0.5756249999999965,40,absolute
+ct,0.25,2.0,0.06,1.5,TV,0.15,0.0,0.35,40,absolute
+ct,0.25,2.0,0.06,1.5,TV-long,0.2,0.025,0.425,40,absolute
+ct,0.25,2.0,0.06,1.5,PnP-const,0.05,0.0,0.125,40,absolute
+ct,0.25,2.0,0.06,1.5,PnP-TVinit,0.325,0.05,0.675,40,absolute
+ct,0.25,2.0,0.06,1.5,PnP-const - TV,-0.1,-0.225,0.0,40,paired_diff
+ct,0.25,2.0,0.06,1.5,PnP-TVinit - TV-long,0.125,-0.025,0.3,40,paired_diff
+ct,0.25,4.0,0.06,0.5,FBP-Hann,71.55,51.699375,93.51249999999993,40,absolute
+ct,0.25,4.0,0.06,0.5,TV,5.625,2.349375,9.900624999999996,40,absolute
+ct,0.25,4.0,0.06,0.5,TV-long,4.425,1.85,7.750624999999997,40,absolute
+ct,0.25,4.0,0.06,0.5,PnP-const,1.025,0.325,1.9,40,absolute
+ct,0.25,4.0,0.06,0.5,PnP-TVinit,3.025,1.15,5.425,40,absolute
+ct,0.25,4.0,0.06,0.5,PnP-const - TV,-4.6,-7.9506250000000005,-1.8,40,paired_diff
+ct,0.25,4.0,0.06,0.5,PnP-TVinit - TV-long,-1.4,-2.525,-0.425,40,paired_diff
+ct,0.25,4.0,0.06,0.75,FBP-Hann,46.275,29.274375,65.50249999999998,40,absolute
+ct,0.25,4.0,0.06,0.75,TV,2.375,0.825,4.375624999999997,40,absolute
+ct,0.25,4.0,0.06,0.75,TV-long,1.85,0.699375,3.3006249999999966,40,absolute
+ct,0.25,4.0,0.06,0.75,PnP-const,0.675,0.2,1.3,40,absolute
+ct,0.25,4.0,0.06,0.75,PnP-TVinit,1.575,0.55,2.95,40,absolute
+ct,0.25,4.0,0.06,0.75,PnP-const - TV,-1.7,-3.1,-0.5243750000000035,40,paired_diff
+ct,0.25,4.0,0.06,0.75,PnP-TVinit - TV-long,-0.275,-0.8,0.25,40,paired_diff
+ct,0.25,4.0,0.06,1.0,FBP-Hann,27.05,14.448749999999999,41.600625,40,absolute
+ct,0.25,4.0,0.06,1.0,TV,1.05,0.275,2.0256249999999967,40,absolute
+ct,0.25,4.0,0.06,1.0,TV-long,0.7,0.225,1.2756249999999965,40,absolute
+ct,0.25,4.0,0.06,1.0,PnP-const,0.375,0.1,0.75,40,absolute
+ct,0.25,4.0,0.06,1.0,PnP-TVinit,1.025,0.275,2.05,40,absolute
+ct,0.25,4.0,0.06,1.0,PnP-const - TV,-0.675,-1.3,-0.15,40,paired_diff
+ct,0.25,4.0,0.06,1.0,PnP-TVinit - TV-long,0.325,0.024375000000000036,0.725,40,paired_diff
+ct,0.25,4.0,0.06,1.5,FBP-Hann,7.9,3.099375,13.950624999999995,40,absolute
+ct,0.25,4.0,0.06,1.5,TV,0.25,0.025,0.575,40,absolute
+ct,0.25,4.0,0.06,1.5,TV-long,0.2,0.0,0.5,40,absolute
+ct,0.25,4.0,0.06,1.5,PnP-const,0.125,0.0,0.275,40,absolute
+ct,0.25,4.0,0.06,1.5,PnP-TVinit,0.325,0.025,0.725,40,absolute
+ct,0.25,4.0,0.06,1.5,PnP-const - TV,-0.125,-0.325,0.0,40,paired_diff
+ct,0.25,4.0,0.06,1.5,PnP-TVinit - TV-long,0.125,0.025,0.275,40,paired_diff
+shapes,0.25,2.0,0.06,0.5,FBP-Hann,80.55,56.7475,105.90374999999999,20,absolute
+shapes,0.25,2.0,0.06,0.5,TV,38.75,21.1,60.95,20,absolute
+shapes,0.25,2.0,0.06,0.5,TV-long,36.2,19.0,57.80249999999998,20,absolute
+shapes,0.25,2.0,0.06,0.5,PnP-const,46.6,36.25,58.00124999999999,20,absolute
+shapes,0.25,2.0,0.06,0.5,PnP-TVinit,48.1,29.8,71.00125,20,absolute
+shapes,0.25,2.0,0.06,0.5,PnP-const - TV,7.85,-4.80125,18.252499999999987,20,paired_diff
+shapes,0.25,2.0,0.06,0.5,PnP-TVinit - TV-long,11.9,7.9,16.1,20,paired_diff
+shapes,0.25,2.0,0.06,0.75,FBP-Hann,34.25,20.947499999999998,49.85124999999999,20,absolute
+shapes,0.25,2.0,0.06,0.75,TV,22.25,10.85,36.45,20,absolute
+shapes,0.25,2.0,0.06,0.75,TV-long,21.05,10.0,34.6,20,absolute
+shapes,0.25,2.0,0.06,0.75,PnP-const,17.9,11.047500000000001,25.5,20,absolute
+shapes,0.25,2.0,0.06,0.75,PnP-TVinit,29.75,16.6,46.85,20,absolute
+shapes,0.25,2.0,0.06,0.75,PnP-const - TV,-4.35,-11.70125,2.05,20,paired_diff
+shapes,0.25,2.0,0.06,0.75,PnP-TVinit - TV-long,8.7,5.45,12.55,20,paired_diff
+shapes,0.25,2.0,0.06,1.0,FBP-Hann,13.9,7.04875,22.0,20,absolute
+shapes,0.25,2.0,0.06,1.0,TV,13.65,6.49875,22.3,20,absolute
+shapes,0.25,2.0,0.06,1.0,TV-long,13.8,6.3,23.00124999999999,20,absolute
+shapes,0.25,2.0,0.06,1.0,PnP-const,6.1,3.05,9.401249999999994,20,absolute
+shapes,0.25,2.0,0.06,1.0,PnP-TVinit,19.1,9.85,30.90124999999999,20,absolute
+shapes,0.25,2.0,0.06,1.0,PnP-const - TV,-7.55,-12.901250000000001,-2.848750000000007,20,paired_diff
+shapes,0.25,2.0,0.06,1.0,PnP-TVinit - TV-long,5.3,2.6,8.4,20,paired_diff
+shapes,0.25,2.0,0.06,1.5,FBP-Hann,2.7,1.1,4.7,20,absolute
+shapes,0.25,2.0,0.06,1.5,TV,4.75,1.8487500000000001,8.3,20,absolute
+shapes,0.25,2.0,0.06,1.5,TV-long,5.95,2.55,10.151249999999994,20,absolute
+shapes,0.25,2.0,0.06,1.5,PnP-const,0.8,0.35,1.35,20,absolute
+shapes,0.25,2.0,0.06,1.5,PnP-TVinit,8.85,4.15,14.35,20,absolute
+shapes,0.25,2.0,0.06,1.5,PnP-const - TV,-3.95,-6.9,-1.45,20,paired_diff
+shapes,0.25,2.0,0.06,1.5,PnP-TVinit - TV-long,2.9,1.2,4.95,20,paired_diff
+shapes,0.25,4.0,0.06,0.5,FBP-Hann,88.05,72.79875,103.30374999999998,20,absolute
+shapes,0.25,4.0,0.06,0.5,TV,19.2,9.99875,30.70124999999999,20,absolute
+shapes,0.25,4.0,0.06,0.5,TV-long,18.6,9.29875,30.5,20,absolute
+shapes,0.25,4.0,0.06,0.5,PnP-const,47.3,39.75,55.00124999999999,20,absolute
+shapes,0.25,4.0,0.06,0.5,PnP-TVinit,26.6,15.8,39.952499999999986,20,absolute
+shapes,0.25,4.0,0.06,0.5,PnP-const - TV,28.1,21.64875,34.102499999999985,20,paired_diff
+shapes,0.25,4.0,0.06,0.5,PnP-TVinit - TV-long,8.0,4.85,11.25,20,paired_diff
+shapes,0.25,4.0,0.06,0.75,FBP-Hann,52.2,37.847500000000004,66.85125,20,absolute
+shapes,0.25,4.0,0.06,0.75,TV,12.3,5.74875,20.65,20,absolute
+shapes,0.25,4.0,0.06,0.75,TV-long,12.25,5.25,21.15124999999999,20,absolute
+shapes,0.25,4.0,0.06,0.75,PnP-const,30.95,24.447499999999998,38.05124999999999,20,absolute
+shapes,0.25,4.0,0.06,0.75,PnP-TVinit,17.3,9.448749999999999,27.301249999999992,20,absolute
+shapes,0.25,4.0,0.06,0.75,PnP-const - TV,18.65,14.75,22.801249999999992,20,paired_diff
+shapes,0.25,4.0,0.06,0.75,PnP-TVinit - TV-long,5.05,2.9,7.4,20,paired_diff
+shapes,0.25,4.0,0.06,1.0,FBP-Hann,32.65,21.548750000000002,44.55124999999999,20,absolute
+shapes,0.25,4.0,0.06,1.0,TV,8.25,3.6987500000000004,13.751249999999994,20,absolute
+shapes,0.25,4.0,0.06,1.0,TV-long,8.0,3.5987500000000003,13.45,20,absolute
+shapes,0.25,4.0,0.06,1.0,PnP-const,17.35,11.75,23.351249999999993,20,absolute
+shapes,0.25,4.0,0.06,1.0,PnP-TVinit,11.35,5.75,18.55,20,absolute
+shapes,0.25,4.0,0.06,1.0,PnP-const - TV,9.1,5.95,12.85,20,paired_diff
+shapes,0.25,4.0,0.06,1.0,PnP-TVinit - TV-long,3.35,1.5,5.8,20,paired_diff
+shapes,0.25,4.0,0.06,1.5,FBP-Hann,13.2,7.0,20.20124999999999,20,absolute
+shapes,0.25,4.0,0.06,1.5,TV,3.8,1.6,6.451249999999994,20,absolute
+shapes,0.25,4.0,0.06,1.5,TV-long,3.8,1.6,6.451249999999994,20,absolute
+shapes,0.25,4.0,0.06,1.5,PnP-const,3.85,2.05,6.0,20,absolute
+shapes,0.25,4.0,0.06,1.5,PnP-TVinit,5.9,2.9,9.551249999999994,20,absolute
+shapes,0.25,4.0,0.06,1.5,PnP-const - TV,0.05,-1.2,1.3,20,paired_diff
+shapes,0.25,4.0,0.06,1.5,PnP-TVinit - TV-long,2.1,0.95,3.45,20,paired_diff

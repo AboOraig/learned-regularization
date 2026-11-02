@@ -9,7 +9,7 @@ Part B (--gallery 1, needs GPU, ~10 min/dose): re-creates the lesion-FREE recons
 Usage: python run_stage3_step4b.py                       (part A)
        python run_stage3_step4b.py --gallery 1           (A + B, both doses)
 Outputs (results/stage3): step4b_paired.csv, step4b_theta_sweep.csv, step4b_gallery_<set>_dose<f>.png"""
-import argparse, os, glob
+import argparse, os, glob, json
 import numpy as np, pandas as pd
 
 p = argparse.ArgumentParser()
@@ -68,6 +68,11 @@ from src import lesions as L
 dev = "cuda" if torch.cuda.is_available() else "cpu"
 PARAMS = {1.0: dict(hann=0.3, lam=0.003, const=(0.02, 8), tvinit=(0.02, 4)),           # tuned in step 4 (printed in your console log)
           0.25: dict(hann=0.16, lam=0.01, const=(0.05, 8), tvinit=(0.02, 8))}
+for f_ in list(PARAMS):                                                 # tuned parameters saved by run_stage3_step4.py take precedence
+    pj = f"{a.out}/step4_params_dose{f_:g}.json"
+    if os.path.exists(pj):
+        d = json.load(open(pj)); PARAMS[f_] = dict(hann=d["hann"], lam=d["lam"], lam_long=d.get("lam_long", d["lam"]), const=tuple(d["const"]), tvinit=tuple(d["tvinit"]))
+        print(f"using tuned parameters from {pj}: {PARAMS[f_]}")
 if a.override:
     ov = dict(kv.split("=") for kv in a.override.split(","))
     sk = lambda v: tuple(float(t) if i == 0 else int(t) for i, t in enumerate(v.split("/")))
@@ -89,7 +94,7 @@ def recon_all(y, prm):
     tv = tv_pdhg(op, y, prm["lam"], a.tv_iters, x0, L_)
     sd, k = prm["const"]; pc = pnp_ct(op, y, den, sd, eta, (k,), x0)[k]
     sd, k = prm["tvinit"]; pt = pnp_ct(op, y, den, sd, eta, (k,), tv)[k]
-    return {"FBP-Hann": x0, "TV": tv, "TV-long": tv_pdhg(op, y, prm["lam"], 2 * a.tv_iters, x0, L_), "PnP-const": pc, "PnP-TVinit": pt}
+    return {"FBP-Hann": x0, "TV": tv, "TV-long": tv_pdhg(op, y, prm.get("lam_long", prm["lam"]), 2 * a.tv_iters, x0, L_), "PnP-const": pc, "PnP-TVinit": pt}
 
 
 sweep = []
@@ -138,13 +143,14 @@ for f in fl(a.doses):
                 y0, x0 = int(np.clip(cy - 32, 0, IMG - 64)), int(np.clip(cx - 32, 0, IMG - 64))
                 crop = lambda im: im.reshape(IMG, IMG)[y0:y0 + 64, x0:x0 + 64].float().numpy()
                 tr = crop(X[img])
-                lo_, hi_ = max(0, np.percentile(tr, 1) - 0.05), min(1, np.percentile(tr, 99) + 0.05)
+                allv = np.concatenate([tr.ravel()] + [crop(REC[m][img]).ravel() for m in ("FBP-Hann", "TV", "PnP-const", "PnP-TVinit")])
+                lo_, hi_ = max(0, np.percentile(allv, 0.5) - 0.02), min(1, np.percentile(allv, 99.5) + 0.02)   # window from truth AND reconstructions
                 for col, (lab, im) in enumerate([("truth", X[img])] + [(m, REC[m][img]) for m in ("FBP-Hann", "TV", "PnP-const", "PnP-TVinit")]):
                     ax = axs[row, col]; ax.imshow(crop(im), cmap="gray", vmin=lo_, vmax=hi_); ax.set_xticks([]); ax.set_yticks([])
                     ax.add_patch(plt.Circle((cx - x0, cy - y0), 8, fill=False, color="r", lw=0.8))
                     ax.set_title(lab if row % a.n_gal == 0 and False else (f"{lab}" + (f"  [{who}: {val:.2f}x nominal]" if lab == who else "")), fontsize=7)
                 axs[row, 0].set_ylabel(f"worst {who}\nimg {img}", fontsize=7)
-        fig.suptitle(f"{name}, dose {f:g}: strongest UNSUPPORTED blob (sigma_l=4 detector, nominal = contrast 0.06 lesion); window = truth crop 1-99% +-0.05", fontsize=8)
+        fig.suptitle(f"{name}, dose {f:g}: strongest UNSUPPORTED blob (sigma_l=4 detector, nominal = contrast 0.06 lesion); window = 0.5-99.5% of truth+recon crops", fontsize=8)
         fig.tight_layout(); fig.savefig(f"{a.out}/step4b_gallery_{name}_dose{f:g}.png", dpi=110); plt.close(fig)
         # consistency check against step 4 (m = 0.5 must reproduce its false-lesion counts)
         fn = f"{a.out}/step4_{name}_dose{f:g}.npz"
