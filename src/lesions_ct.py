@@ -92,7 +92,8 @@ def unsupported_map(recon, truth, rho, nom, nms=5, support_radius=2, support_fra
 def _stat(R, s, c, m, kind, idx):
     if kind == "auc":
         return cluster_paired_auc(R[f"t1|{s:g}|{c:g}|{m}"], R[f"t0|{s:g}|{c:g}|{m}"], R[f"valid|{s:g}|{c:g}"], idx)
-    return float(R[f"fl|{s:g}|{c:g}|{m}"][idx].mean())
+    key = "fl" if kind == "fl" else kind                      # kind: "auc", "fl" (threshold 0.5x nominal), "fl1", "fl1.5", ...
+    return float(R[f"{key}|{s:g}|{c:g}|{m}"][idx].mean())
 
 
 def paired_diff(R, types, mA, mB, kind, n_boot=2000, seed=0):

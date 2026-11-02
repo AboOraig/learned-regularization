@@ -97,3 +97,19 @@ def test_paired_diff_and_unsupported_map():
     assert int(((Rm >= 0.5 * nom) & un).sum()) == 1 and int(((Rm >= 1.5 * nom) & un).sum()) == 0
     Rm, un = C.unsupported_map(inv, inv, rho, nom, size=S_)
     assert int(((Rm >= 0.5 * nom) & un).sum()) == 0
+
+
+def test_tune_climb_extends_and_stops():
+    from src.tune_ct import climb
+    f = lambda v: -(v - 5.0) ** 2
+    b, sc = climb([1.0, 2.0], f, lambda b: b - 1 if b > 0 else None, lambda b: b + 1, 5, "t", log=lambda s: None)
+    assert b == 5.0 and 6.0 in sc
+    b, sc = climb([1.0, 2.0], f, lambda b: b - 1, lambda b: b + 1, 0, "t", log=lambda s: None)
+    assert b == 2.0 and len(sc) == 2                           # no extension when rounds = 0
+
+
+def test_paired_diff_threshold_kinds():
+    rng = np.random.default_rng(1); S = 20
+    R = {"psnr|A": np.zeros(S), "psnr|B": np.zeros(S), "fl1|2|0.06|A": np.full(S, 2.0), "fl1|2|0.06|B": np.full(S, 5.0)}
+    d, lo, hi = C.paired_diff(R, [(2.0, 0.06)], "A", "B", "fl1", 100)
+    assert d == -3.0 and lo == hi == -3.0
