@@ -15,7 +15,7 @@
 \title{\LARGE\textbf{Learned Regularization for Robust Image Reconstruction:}\\[4pt]
 \large\textbf{A Comparative Study of Plug-and-Play Priors under Noise,\\
 Undersampling, Model Mismatch, and Distribution Shift}}
-\author{Mohammed Abo Oraig \\ \small Independent research; University of Toulon \\ \small \texttt{mohammed-abo-oraig@etud.univ-tln.fr}}
+\author{Mohammed Abo Oraig \\ \small Independent research \\ \small \texttt{mohammed-abo-oraig@etud.univ-tln.fr}}
 \date{}
 
 
@@ -44,7 +44,14 @@ that even in distribution the PSNR-tuned PnP reconstruction detects small insert
 than TV (paired AUC $0.69$ vs.\ $0.91$ for a $0.75$\,px lesion), attenuating them rather than inventing
 structure, whereas under prior mismatch it creates lesion-like blobs up to an order of magnitude more often
 than TV. Re-tuning towards lesion fidelity recovers TV-level detection only at the price of its PSNR advantage
-or of false structure. We argue that task-based and robustness evaluation should be standard components of
+or of false structure. Finally we move to clinical-size data: $362\times362$ slices of LoDoPaB-CT with its Poisson photon model, patient-disjoint training,
+validation and test sets, 30, 60 and 120 of the 1000 projection angles, and one, one quarter and one tenth of the native dose.
+A DnCNN prior trained on 632 patients does not outperform a well-tuned TV in PSNR (differences between $-0.93$ and $+0.33$\,dB over nine
+conditions) and has a lower SSIM in seven of them, but it detects small inserted lesions better than TV in all nine (paired AUC $+0.03$ to $+0.16$, significant in six),
+whereas TV tuned for PSNR detects them worse than unregularised filtered back-projection in all nine (significant in seven) despite a PSNR gain of $0.8$--$2.3$\,dB.
+On non-anatomical phantoms the detection advantage is retained in one of six conditions, the PSNR and SSIM deficit against TV is consistent,
+and the number of false lesion-like blobs relative to TV changes sign with the number of angles.
+We argue that task-based and robustness evaluation should be standard components of
 learned-prior reconstruction studies.
 We then replace the explicit forward matrix by a matrix-free operator with an exactly matched adjoint and
 the Gaussian noise by a Beer--Lambert Poisson model with 10--1000 photons per ray; the ranking of the methods,
@@ -121,6 +128,10 @@ evaluation alone.
 \item A matrix-free implementation of the projector and its exact adjoint, validated against the dense operator, and a
       Poisson (low-dose) noise study, showing that the conclusions above carry over to the settings required for
       clinical-size data (Sections~\ref{sec:mf-results}--\ref{sec:lesion-poisson}).
+\item A patient-disjoint study on LoDoPaB-CT ($362\times362$, exact Poisson dose thinning, crime-free simulation validated against the real observations to $0.15$\,dB)
+      of three questions: whether the learned prior keeps its advantage over TV when the image distribution changes, whether it creates lesion-like structure that is not in the object, and whether the conclusions
+      hold over a grid of three doses and three angle counts (Sections~\ref{sec:e14}--\ref{sec:e19}). The study reports negative and mixed results, a superseded early comparison, and the
+      analysis steps taken after seeing results (Section~\ref{sec:history3}).
 \end{itemize}
 
 \section{Related Work}
@@ -352,6 +363,54 @@ $\sigma\in[0.02,0.2]$ of the earlier experiments. The data are generated from th
 unchanged and treat $\hat p$ with an unweighted least-squares data term (a Gaussian approximation); for PnP we also
 tested a variant with weights $w=N/I_0$ (an inverse-variance weighting up to a constant). All hyperparameters are tuned at each dose on 100 held-out MNIST validation images
 and frozen for every test set.
+
+\subsection{LoDoPaB-CT setting}\label{sec:lodopab}
+LoDoPaB-CT~\cite{leuschner2021} provides $362\times362$ slices with values $\mu/\mu_{\max}\in[0,1]$ and simulated low-dose observations of 1000 parallel-beam angles on 513 detector bins.
+The official split has 35\,820 training slices from 632 patients, 3\,522 validation slices from 60 patients and 3\,553 test slices from 60 patients; we verified that the three sets of patient identifiers
+are disjoint. We use 8\,960 training slices (from the 632 training patients) to train the prior, 20 validation slices, one from each of 20 patients, for all tuning, and 40 test slices, one from each of 40
+patients (the same 40 in every experiment), for all evaluation; the patient is therefore the unit of statistical analysis. The projector is a matrix-free parallel-beam operator with a unit-tested adjoint;
+its conventions (rotation sign, detector flip, image transposition, angle offset) were fixed by projecting the ground truth and comparing with the supplied observations over 16 variants: the selected one has a relative residual of $0.038$ (correlation $0.9979$), the best alternative $0.166$,
+and the fitted pixel size is $1.0044$ times the nominal $0.26\,\mathrm{m}/362$. Sparse-view data use $K\in\{30,60,120\}$ evenly spaced angles out of the 1000.
+ 
+\subsection{Dose model and simulation}\label{sec:sim3}
+The observations follow $y=-\ln(N/N_0)/\mu_{\max}$ with $N\sim\mathrm{Poisson}(N_0e^{-\mu_{\max}Ax})$, $N_0=4096$ photons per ray, $\mu_{\max}=81.35858\,\mathrm{m^{-1}}$, and zero counts replaced by $0.1$.
+This was checked on the data: the counts recovered from the observations are integers in $100\%$ of the bins for $N_0=4096$ (and 8192), against $9.7$--$10.4\%$ for perturbed values of $\mu_{\max}$ (chance level $10\%$) and $24.7\%$ and $49.9\%$ for $N_0=1024$ and 2048.
+The dispersion index $\overline{(N-\lambda)^2/\lambda}$ around the counts expected from the ground truth is $1.06$, $1.25$ and $1.81$ for expected counts in $[20,200)$, $[200,1000)$ and $[1000,5000)$; values above one include discretisation and ground-truth error, so the real data may contain somewhat more variance than the simulation.
+Lower doses $f\in\{1,0.25,0.1\}$ (4096, 1024 and about 410 photons per ray) are obtained from the real observations by exact binomial thinning of the recovered counts (a thinned Poisson variable is Poisson with $f$ times the mean), which is used for \emph{tuning}.
+For \emph{evaluation} the data are simulated without the inverse crime: the slice is up-sampled by a factor two (bicubic), projected on the $724\times724$ grid with half-size pixels and 1026 detector bins, pairs of bins are averaged, and Poisson noise is added exactly as above.
+Table~\ref{tab:simcheck} shows that reconstructions from simulated and from real data of the same slices have the same TV PSNR within $0.15$\,dB in all nine conditions.
+ 
+\subsection{Methods and tuning}\label{sec:methods3}
+\emph{FBP-Hann}: filtered back-projection with a Hann window whose cut-off (a fraction of Nyquist) is tuned. \emph{TV}: isotropic total variation with the box constraint $[0,1]$, solved by the primal--dual algorithm of Chambolle and Pock~\cite{chambolle2011} for 150 iterations
+from the FBP-Hann image; \emph{TV-long} is the same with 300 iterations and its own tuned weight, a control for the extra iterations that PnP performs. \emph{PnP-const}: $x_{k+1}=D_{\sigma_d}\bigl(x_k-\eta A^\top(Ax_k-y)\bigr)$, $\eta=1/L$, started from the FBP-Hann image, with
+$(\sigma_d,k)$ tuned; \emph{PnP-TVinit}: the same started from the TV solution. $D_\sigma$ is a noise-level-conditioned DnCNN (8 layers, 64 channels, $\sigma$ as a second input channel, residual output) trained for 15\,000 steps (batch 16, random $128\times128$ crops and flips, $\sigma\sim U(0,0.1)$, Adam, cosine schedule);
+on the 20 validation slices it improves the PSNR of images with additive Gaussian noise from $33.98$, $26.02$, $20.00$\,dB to $41.98$, $38.45$, $35.53$\,dB at $\sigma=0.02,0.05,0.1$.
+Every method and condition is tuned separately on the 20 validation slices (real observations, thinned and angle-subsampled) by maximising the mean PSNR (peak 1, reconstructions clipped to $[0,1]$); whenever the optimum falls on the boundary of a grid, the grid is extended (up to twice; cut-off $\times0.75$ or $+0.1$, TV weight $\times3$ or $\div3$,
+$\sigma_d$ $\times1.6$ or $\div1.6$). Table~\ref{tab:params3} lists the final choices; two optima remain on a boundary: $\sigma_d=0.0039$ of PnP-TVinit at $K=120$, full dose (the lower end after two extensions, i.e.\ almost no denoising) and $k=1$ of PnP-TVinit at $K=120$, dose $0.1$ (the smallest iteration count allowed).
+In these two cells PnP-TVinit is essentially TV followed by a few data-consistency steps.
+ 
+\subsection{Lesion observer}\label{sec:observer3}
+The protocol of Section~\ref{sec:lesion} is applied to $362\times362$ slices. Lesions are additive Gaussian blobs, clipped to $[0,1]$, with $\sigma_l\in\{2,4\}$\,px ($1.4$ and $2.9$\,mm at $0.72$\,mm per pixel) and contrast $c=0.06$ on the $\mu/\mu_{\max}$ scale
+(in the step at $K=60$ also $c=0.03$). If water is taken to be about $0.25$ on this scale, which is an assumption, $c=0.06$ and $0.03$ correspond to roughly $240$ and $120$\,HU; the lesions are small and noisy at low dose but are not low-contrast in the clinical sense.
+Four lesions of one type are inserted into each slice at random positions at least $10\sigma_{l,\max}+4=44$\,px apart, inside the body eroded by 22\,px (CT slices) or in the central square (phantoms); the lesion-free and lesion-present images are reconstructed from independent noise realisations.
+A lesion is valid if its inserted response is at least half the nominal one. The observer is the location-known, zero-sum local-contrast statistic of Section~\ref{sec:lesion} (disc of radius $\lceil1.5\sigma_l\rceil$ minus a 3-px annulus), and the detection score is the paired AUC pooled over valid lesions (up to $40\times4=160$ lesions per lesion type on CT slices, $20\times4=80$ on phantoms).
+A \emph{false blob} is a local maximum (in a $5\times5$ window) of the response map of a lesion-\emph{free} reconstruction whose response is at least $m\,r_{\rm nom}$ ($r_{\rm nom}$: response to the nominal lesion on an empty background; $m\in\{0.5,0.75,1,1.5\}$) and for which the truth has no response above half of $0.5\,r_{\rm nom}$ within 2\,px.
+$m=1$ and $1.5$ count structures that a reader of this statistic would take for at least a full lesion. The statistic measures lesion-like response at the scale of the kernel; we did not run a reader study, so ``convincing'' is shorthand for this response.
+ 
+\subsection{Statistics}\label{sec:stats3}
+All comparisons are paired: two methods are evaluated on the same patients and the same simulated data, and the difference is summarised by its mean over patients with a $95\%$ percentile bootstrap interval over patients (2\,000 resamples in the $K=60$ lesion experiments, 5\,000 elsewhere), with the same resamples for both methods.
+Lesion types are pooled with equal weight; per-type rows are exploratory. For the shift comparison, the CT and phantom differences are bootstrapped independently (different images) and their difference is the \emph{shift effect}. No correction for multiplicity is applied, so we report the numbers of cells with significant positive and negative differences
+and read the sign pattern across conditions rather than any single interval: with 80 per-type intervals at the $5\%$ level about four would exclude zero by chance, whereas 25 and 35 did. Each condition uses one noise realisation, which limits the precision of a single cell (for AUC about $\pm0.05$); the 20 phantoms are the same in all conditions, so conditions are not independent.
+ 
+\subsection{Analysis history}\label{sec:history3}
+The analysis was developed in steps, and some of them changed the conclusions. We list them because they affect how the final numbers should be read. (i)~A first comparison at $K=60$ (tuning on 6 validation slices, Hann cut-off $0.2$) found PnP $0.85$ and $0.33$\,dB below TV at full and quarter dose.
+Re-tuning on 20 slices (cut-off $0.3$ at full dose) raised PnP-const by $1.06$\,dB ($30.68\to31.74$) and $0.32$\,dB ($29.40\to29.72$) but TV by only $0.38$ and $0.09$\,dB, and the gap became $-0.17$ and $-0.10$\,dB (Table~\ref{tab:e15}); the initial gap was an artefact of the starting image and the small tuning set, and we do not use it.
+(ii)~The lesion experiments were first tuned on 10 slices with narrow grids; they were repeated with 20 slices, extended grids and a separately tuned TV-long. At full dose the parameters of FBP, TV, TV-long and PnP-const did not change (the PSNR of PnP-TVinit changed by $0.07$\,dB) and no pooled verdict changed; at quarter dose one of 20 pooled verdicts changed (PnP-TVinit $-$ TV-long AUC, from significant to not significant).
+(iii)~Paired statistics, the threshold sweep and the false-blob definition at several strengths were added after seeing the first lesion results, and the dose $\times$ angle grid and the shift extension to $K=30,120$ were run afterwards; none of this was pre-specified. (iv)~Edge-of-grid optima and the coarse TV grid (factor three) are described in Section~\ref{sec:methods3} and in the Limitations.
+ 
+
+
+
 
 
 
@@ -943,12 +1002,253 @@ denoisers; error bars: s.d.\ over seeds.}\label{fig:lesion-poisson}
 \end{figure}
 
 
+\subsection{E14: Data, noise model and simulator}\label{sec:e14}
+The geometry fit, the noise-model checks and the dose thinning are described in Sections~\ref{sec:lodopab}--\ref{sec:sim3}. The decisive check for everything that follows is the simulator: Table~\ref{tab:simcheck} compares the TV PSNR obtained from the
+real (thinned) observations with that obtained from our crime-free simulation of the same slices. The agreement is within $0.15$\,dB at all conditions; for all 40 slices at $K=60$ the values are $31.91$ vs.\ $32.04$\,dB (full dose) and $29.82$ vs.\ $29.83$\,dB (quarter dose), and for FBP-Hann $30.65$ vs.\ $30.59$ and $28.73$ vs.\ $28.66$\,dB.
+The nine-condition check uses the first 8 test slices only. Residual differences are small compared with the method differences studied below ($\le 2.3$\,dB), but they are not zero, and the simulated data may be somewhat less noisy than the real ones at high counts (dispersion index above).
+ 
+\begin{table}[htbp]
+\centering\small\setlength{\tabcolsep}{5pt}
+\caption{TV PSNR (dB) from real observations (thinned to the dose, subsampled to $K$ angles) and from the crime-free simulation of the same slices (first 8 test slices).}\label{tab:simcheck}
+\begin{tabular}{llccccccccc}
+\toprule
+$K$ & & \multicolumn{3}{c}{30} & \multicolumn{3}{c}{60} & \multicolumn{3}{c}{120}\\
+\cmidrule(lr){3-5}\cmidrule(lr){6-8}\cmidrule(lr){9-11}
+dose & & 1 & 0.25 & 0.1 & 1 & 0.25 & 0.1 & 1 & 0.25 & 0.1\\
+\midrule
+real & & 29.34 & 27.95 & 26.57 & 30.15 & 28.40 & 26.73 & 30.61 & 28.54 & 27.89\\
+simulated & & 29.41 & 27.90 & 26.52 & 30.27 & 28.45 & 26.72 & 30.76 & 28.55 & 27.85\\
+\bottomrule
+\end{tabular}
+\end{table}
+ 
+\begin{table}[htbp]
+\centering\small\setlength{\tabcolsep}{4pt}
+\caption{Tuned parameters (20 validation slices per condition): Hann cut-off, TV weight (the TV-long weight was the same in every condition), and $(\sigma_d,k)$ of PnP-const and PnP-TVinit.}\label{tab:params3}
+\begin{tabular}{llcccc}
+\toprule
+$K$ & dose & Hann & TV $\lambda$ & PnP-const $(\sigma_d,k)$ & PnP-TVinit $(\sigma_d,k)$\\
+\midrule
+30  & 1    & 0.2  & 0.003 & (0.02, 12) & (0.02, 4)\\
+30  & 0.25 & 0.16 & 0.01  & (0.05, 8)  & (0.08, 4)\\
+30  & 0.1  & 0.12 & 0.03  & (0.08, 12) & (0.05, 8)\\
+60  & 1    & 0.3  & 0.003 & (0.02, 8)  & (0.02, 2)\\
+60  & 0.25 & 0.2  & 0.01  & (0.08, 4)  & (0.02, 8)\\
+60  & 0.1  & 0.12 & 0.03  & (0.05, 12) & (0.02, 12)\\
+120 & 1    & 0.4  & 0.003 & (0.05, 2)  & (0.0039, 8)$^\dagger$\\
+120 & 0.25 & 0.2  & 0.01  & (0.02, 12) & (0.0062, 8)\\
+120 & 0.1  & 0.16 & 0.01  & (0.05, 8)  & (0.128, 1)$^\dagger$\\
+\bottomrule
+\end{tabular}\\[2pt]
+{\footnotesize $^\dagger$ optimum on the boundary of the grid after the automatic extensions.}
+\end{table}
+ 
+\subsection{E15: Learned prior versus TV on real slices at $K=60$}\label{sec:e15}
+Table~\ref{tab:e15} compares PnP variants with TV on the 40 test slices at $K=60$ (denoiser of depth 8 and a deeper one, 17 layers, trained for 20\,000 steps). With the re-tuned starting image, PnP-const is slightly but significantly below TV ($-0.17$ and $-0.10$\,dB) and PnP-TVinit is at TV level
+at full dose ($+0.03$\,dB, interval $[-0.00,+0.06]$) and $+0.21$\,dB above it at quarter dose. The deeper denoiser does not help (PnP-const $-0.30$ and $-0.25$\,dB). Annealing $\sigma_d$ over the iterations is worse than constant $\sigma_d$ at full dose ($-0.65$\,dB) and better at quarter dose ($+0.12$\,dB, but not for the deeper denoiser: $+0.05$, interval including zero).
+One denoiser pass on the TV image gives TV (within $\pm0.05$\,dB at the depth-8 network). In short, on clinical-size slices and at $K=60$ the learned prior is competitive with TV in PSNR rather than $\approx4$\,dB better as in the $28\times28$ experiments, with the largest gain, $0.2$\,dB, from combining the two.
+ 
+\begin{table}[htbp]
+\centering\small\setlength{\tabcolsep}{4pt}
+\caption{$K=60$, 40 test slices: PSNR (dB) and SSIM, and the paired PSNR difference to TV (mean, 95\% bootstrap interval over patients; * excludes 0). d8: 8-layer denoiser; d17: 17-layer denoiser.}\label{tab:e15}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lcccccc}
+\toprule
+ & \multicolumn{3}{c}{dose 1} & \multicolumn{3}{c}{dose 0.25}\\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}
+Method & PSNR & SSIM & $-$TV & PSNR & SSIM & $-$TV\\
+\midrule
+FBP-Hann            & 30.65 & 0.738 & ${-}1.27^{*}$ & 28.73 & 0.699 & ${-}1.09^{*}$\\
+TV                  & 31.91 & 0.786 & -- & 29.82 & 0.750 & --\\
+PnP-const [d8]      & 31.74 & 0.773 & ${-}0.17^{*}$ {\scriptsize$[{-}0.21,{-}0.13]$} & 29.72 & 0.734 & ${-}0.10^{*}$ {\scriptsize$[{-}0.18,{-}0.03]$}\\
+PnP-TVinit [d8]     & 31.94 & 0.784 & $+0.03$ {\scriptsize$[{-}0.00,+0.06]$} & 30.03 & 0.753 & $+0.21^{*}$ {\scriptsize$[+0.17,+0.25]$}\\
+PnP-anneal [d8]     & 31.26 & 0.769 & ${-}0.65^{*}$ {\scriptsize$[{-}0.77,{-}0.52]$} & 29.94 & 0.750 & $+0.12^{*}$ {\scriptsize$[+0.05,+0.18]$}\\
+TV+denoise [d8]     & 31.91 & 0.785 & $+0.00$ {\scriptsize$[{-}0.02,+0.03]$} & 29.77 & 0.747 & ${-}0.05$ {\scriptsize$[{-}0.10,+0.01]$}\\
+PnP-const [d17]     & 31.61 & 0.777 & ${-}0.30^{*}$ {\scriptsize$[{-}0.35,{-}0.26]$} & 29.57 & 0.737 & ${-}0.25^{*}$ {\scriptsize$[{-}0.31,{-}0.19]$}\\
+PnP-TVinit [d17]    & 31.89 & 0.785 & ${-}0.02$ {\scriptsize$[{-}0.06,+0.03]$} & 29.97 & 0.755 & $+0.15^{*}$ {\scriptsize$[+0.12,+0.18]$}\\
+PnP-anneal [d17]    & 31.20 & 0.772 & ${-}0.71^{*}$ {\scriptsize$[{-}0.85,{-}0.58]$} & 29.87 & 0.753 & $+0.05$ {\scriptsize$[{-}0.01,+0.12]$}\\
+TV+denoise [d17]    & 31.90 & 0.786 & ${-}0.02$ {\scriptsize$[{-}0.05,+0.02]$} & 29.84 & 0.752 & $+0.02^{*}$ {\scriptsize$[+0.00,+0.04]$}\\
+\bottomrule
+\end{tabular}}
+\end{table}
+ 
+\subsection{E16: Accuracy over the dose $\times$ angle grid}\label{sec:e16}
+Table~\ref{tab:grid3} gives the mean PSNR and SSIM of the five methods in the nine conditions of the lesion-free arm, and Table~\ref{tab:acc3} the paired differences. Three statements hold in all nine conditions: PnP-const and TV-long beat FBP-Hann in PSNR (PnP-const by $0.93$--$1.36$\,dB, TV-long by $0.81$--$2.28$\,dB) and in SSIM, with all intervals excluding zero.
+PnP-const is \emph{not} better than TV-long on average: its PSNR difference lies between $-0.93$ and $+0.33$\,dB, significantly positive in three conditions ($K=30$ and $60$ at dose 0.1, and $K=120$ at full dose), significantly negative in four ($K=30$, $60$ at full dose; $K=60$ at quarter dose; $K=120$ at dose 0.1) and not significant in two;
+its SSIM is below TV-long's in eight of nine conditions, significantly so in seven, and above it in one ($+0.001$, not significant). The sign does not follow dose or angle count monotonically (the low-dose, few-view advantage at $K=30$ and $60$ is reversed at $K=120$, dose 0.1). PnP-TVinit has the highest mean PSNR in seven of nine conditions, by at most $0.49$\,dB over TV-long
+(significantly higher in five, lower in two: $K=30$, full dose, $-0.15$\,dB, and $K=60$, full dose, $-0.03$\,dB).
+Two of its cells are not denoiser effects (Section~\ref{sec:methods3}). TV-long is slightly worse than TV at $K=120$, full dose ($32.50$ vs.\ $32.64$\,dB), which shows that the early-stopped 150-iteration TV is itself a tuned object and that the weight grid is coarse.
+ 
+\begin{table}[htbp]
+\centering\small\setlength{\tabcolsep}{3pt}
+\caption{Mean PSNR (dB, upper block) and SSIM (lower block) of the lesion-free reconstructions, 40 patients (best in each condition in bold). Columns: $K$ angles / dose.}\label{tab:grid3}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{lccccccccc}
+\toprule
+ & \multicolumn{3}{c}{$K=30$} & \multicolumn{3}{c}{$K=60$} & \multicolumn{3}{c}{$K=120$}\\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}\cmidrule(lr){8-10}
+Method & 1 & 0.25 & 0.1 & 1 & 0.25 & 0.1 & 1 & 0.25 & 0.1\\
+\midrule
+\multicolumn{10}{l}{PSNR (dB)}\\
+FBP-Hann & 29.02 & 27.72 & 26.63 & 30.59 & 28.66 & 27.11 & 31.70 & 29.18 & 27.94 \\
+TV & 30.98 & 29.15 & 27.69 & 32.04 & 29.83 & 27.93 & 32.64 & 30.07 & 29.13 \\
+TV-long & \textbf{31.31} & 29.21 & 27.72 & \textbf{32.12} & 29.88 & 27.98 & 32.50 & 30.11 & 29.21 \\
+PnP-const & 30.38 & 29.05 & 27.86 & 31.85 & 29.68 & 28.31 & 32.64 & 30.23 & 28.86 \\
+PnP-TVinit & 31.15 & \textbf{29.22} & \textbf{27.96} & 32.09 & \textbf{30.04} & \textbf{28.47} & \textbf{32.92} & \textbf{30.46} & \textbf{29.26} \\
+\midrule
+\multicolumn{10}{l}{SSIM}\\
+FBP-Hann & 0.692 & 0.666 & 0.655 & 0.738 & 0.699 & 0.680 & 0.763 & 0.725 & 0.693 \\
+TV & 0.765 & 0.733 & 0.710 & 0.788 & 0.750 & 0.717 & 0.799 & 0.756 & 0.741 \\
+TV-long & \textbf{0.773} & \textbf{0.737} & 0.713 & \textbf{0.790} & 0.753 & 0.720 & 0.797 & 0.758 & \textbf{0.745} \\
+PnP-const & 0.745 & 0.726 & 0.707 & 0.775 & 0.733 & 0.721 & 0.793 & 0.749 & 0.731 \\
+PnP-TVinit & 0.767 & 0.730 & \textbf{0.721} & 0.786 & \textbf{0.753} & \textbf{0.731} & \textbf{0.805} & \textbf{0.761} & 0.740 \\
+\bottomrule
+\end{tabular}}
+\end{table}
+ 
+\begin{table}[htbp]
+\centering\small\setlength{\tabcolsep}{3pt}
+\caption{Paired differences over patients (mean, 95\% bootstrap interval; $^*$ excludes 0), 40 patients.}\label{tab:acc3}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{llcccc}
+\toprule
+$K$ & dose & PSNR: PnP-const $-$ TV-long & SSIM: PnP-const $-$ TV-long & PSNR: PnP-TVinit $-$ TV-long & PSNR: PnP-const $-$ FBP-Hann\\
+\midrule
+30 & 1 & ${-}0.93^{*}$ {\scriptsize$[{-}1.09,{-}0.75]$} & ${-}0.027^{*}$ {\scriptsize$[{-}0.035,{-}0.021]$} & ${-}0.15^{*}$ {\scriptsize$[{-}0.24,{-}0.06]$} & $+1.36^{*}$ {\scriptsize$[+1.15,+1.58]$} \\
+30 & 0.25 & ${-}0.15$ {\scriptsize$[{-}0.36,+0.08]$} & ${-}0.011^{*}$ {\scriptsize$[{-}0.019,{-}0.002]$} & $+0.01$ {\scriptsize$[{-}0.19,+0.24]$} & $+1.33^{*}$ {\scriptsize$[+1.06,+1.62]$} \\
+30 & 0.1 & $+0.13^{*}$ {\scriptsize$[+0.03,+0.23]$} & ${-}0.006$ {\scriptsize$[{-}0.014,+0.001]$} & $+0.24^{*}$ {\scriptsize$[+0.19,+0.29]$} & $+1.22^{*}$ {\scriptsize$[+0.98,+1.48]$} \\
+60 & 1 & ${-}0.28^{*}$ {\scriptsize$[{-}0.33,{-}0.22]$} & ${-}0.015^{*}$ {\scriptsize$[{-}0.019,{-}0.011]$} & ${-}0.03^{*}$ {\scriptsize$[{-}0.06,{-}0.00]$} & $+1.25^{*}$ {\scriptsize$[+0.97,+1.56]$} \\
+60 & 0.25 & ${-}0.20^{*}$ {\scriptsize$[{-}0.28,{-}0.13]$} & ${-}0.020^{*}$ {\scriptsize$[{-}0.027,{-}0.012]$} & $+0.16^{*}$ {\scriptsize$[+0.11,+0.21]$} & $+1.02^{*}$ {\scriptsize$[+0.65,+1.41]$} \\
+60 & 0.1 & $+0.33^{*}$ {\scriptsize$[+0.23,+0.43]$} & $+0.001$ {\scriptsize$[{-}0.003,+0.005]$} & $+0.49^{*}$ {\scriptsize$[+0.37,+0.62]$} & $+1.20^{*}$ {\scriptsize$[+1.04,+1.37]$} \\
+120 & 1 & $+0.14^{*}$ {\scriptsize$[+0.05,+0.24]$} & ${-}0.004^{*}$ {\scriptsize$[{-}0.007,{-}0.001]$} & $+0.41^{*}$ {\scriptsize$[+0.32,+0.50]$} & $+0.95^{*}$ {\scriptsize$[+0.54,+1.39]$} \\
+120 & 0.25 & $+0.13$ {\scriptsize$[{-}0.02,+0.27]$} & ${-}0.009^{*}$ {\scriptsize$[{-}0.013,{-}0.006]$} & $+0.35^{*}$ {\scriptsize$[+0.25,+0.45]$} & $+1.05^{*}$ {\scriptsize$[+0.89,+1.22]$} \\
+120 & 0.1 & ${-}0.34^{*}$ {\scriptsize$[{-}0.47,{-}0.22]$} & ${-}0.013^{*}$ {\scriptsize$[{-}0.020,{-}0.007]$} & $+0.06$ {\scriptsize$[{-}0.07,+0.19]$} & $+0.92^{*}$ {\scriptsize$[+0.73,+1.13]$} \\
+\bottomrule
+\end{tabular}}
+\end{table}
+ 
+\subsection{E17: Lesion detection}\label{sec:e17}
+\emph{Grid (Table~\ref{tab:det3}).} Pooled over the two lesion sizes (contrast $0.06$; up to 160 lesions per size), PnP-const has a higher paired AUC than TV-long in all nine conditions, by $0.03$ to $0.16$, with intervals excluding zero in six (all three $K=120$ conditions, $K=60$ at doses $0.25$ and $0.1$, $K=30$ at dose $0.1$); it is not significant at full dose for $K=30$ and $60$.
+Against FBP-Hann, however, PnP-const is never significantly better (three positive, six negative or zero differences) and is significantly worse in two conditions ($K=30$, full dose, $-0.075$; $K=120$, quarter dose, $-0.059$): the learned prior removes the detection deficit of TV rather than adding to FBP's detectability.
+TV-long, tuned for PSNR, has a lower AUC than FBP-Hann in all nine conditions (significantly in seven, down to $-0.20$ at $K=60$, dose $0.1$) while being $0.81$--$2.28$\,dB better in PSNR: PSNR and detectability rank the methods in opposite orders. PnP-TVinit exceeds TV-long in AUC in all nine conditions (significantly in seven; $+0.02$ to $+0.17$).
+ 
+\emph{Retention.} At $K=60$ and full dose the regularised methods retain only $7$--$32\%$ of the local-contrast difference of the inserted lesion (FBP-Hann $31$--$67\%$); the detection scores of TV and PnP are therefore obtained mainly from noise suppression, not from preserving lesion contrast.
+ 
+\emph{Earlier analysis at $K=60$ (E17b).} With four lesion types (two sizes, contrasts $0.03$ and $0.06$; 160 lesions per type pooled), re-tuned on 20 slices, the pooled AUC difference PnP-const $-$ TV-long is $+0.023$ ($[-0.013,+0.061]$) at full dose and $+0.073$ ($[+0.023,+0.128]$) at quarter dose, in line with the grid values ($+0.050$ and $+0.100$; different lesion sets and noise). At both doses PnP-const is level with FBP-Hann ($-0.008$, $+0.016$; not significant) and TV is below it ($-0.037$, not significant; $-0.056$, $[-0.11,-0.00]$).
+At $\sigma_l=4$\,px and $c=0.06$ all methods reach AUC $0.95$--$0.96$ at full dose, so the large lesions do not discriminate between methods at that dose (ceiling).
+ 
+\begin{table}[htbp]
+\centering\small\setlength{\tabcolsep}{3pt}
+\caption{Paired AUC differences ($\sigma_l\in\{2,4\}$\,px pooled, $c=0.06$, 40 patients; mean, 95\% interval; $^*$ excludes 0).}\label{tab:det3}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{llccccc}
+\toprule
+$K$ & dose & PnP-const $-$ TV-long & PnP-const $-$ TV & PnP-const $-$ FBP-Hann & TV-long $-$ FBP-Hann & PnP-TVinit $-$ TV-long\\
+\midrule
+30 & 1 & $+0.044$ {\scriptsize$[{-}0.009,+0.097]$} & $+0.006$ {\scriptsize$[{-}0.050,+0.059]$} & ${-}0.075^{*}$ {\scriptsize$[{-}0.116,{-}0.037]$} & ${-}0.119^{*}$ {\scriptsize$[{-}0.169,{-}0.072]$} & $+0.066^{*}$ {\scriptsize$[+0.019,+0.113]$} \\
+30 & 0.25 & $+0.034$ {\scriptsize$[{-}0.025,+0.094]$} & $+0.078^{*}$ {\scriptsize$[+0.013,+0.144]$} & ${-}0.006$ {\scriptsize$[{-}0.056,+0.041]$} & ${-}0.041$ {\scriptsize$[{-}0.103,+0.025]$} & $+0.069^{*}$ {\scriptsize$[+0.006,+0.131]$} \\
+30 & 0.1 & $+0.091^{*}$ {\scriptsize$[+0.019,+0.162]$} & $+0.137^{*}$ {\scriptsize$[+0.059,+0.216]$} & $+0.031$ {\scriptsize$[{-}0.028,+0.091]$} & ${-}0.059$ {\scriptsize$[{-}0.141,+0.019]$} & $+0.053$ {\scriptsize$[{-}0.022,+0.128]$} \\
+60 & 1 & $+0.050$ {\scriptsize$[{-}0.006,+0.103]$} & $+0.000$ {\scriptsize$[{-}0.050,+0.050]$} & ${-}0.037$ {\scriptsize$[{-}0.091,+0.012]$} & ${-}0.087^{*}$ {\scriptsize$[{-}0.144,{-}0.031]$} & $+0.069^{*}$ {\scriptsize$[+0.031,+0.109]$} \\
+60 & 0.25 & $+0.100^{*}$ {\scriptsize$[+0.050,+0.150]$} & $+0.078^{*}$ {\scriptsize$[+0.028,+0.131]$} & ${-}0.009$ {\scriptsize$[{-}0.059,+0.041]$} & ${-}0.109^{*}$ {\scriptsize$[{-}0.175,{-}0.047]$} & $+0.084^{*}$ {\scriptsize$[+0.031,+0.141]$} \\
+60 & 0.1 & $+0.163^{*}$ {\scriptsize$[+0.078,+0.247]$} & $+0.144^{*}$ {\scriptsize$[+0.072,+0.219]$} & ${-}0.041$ {\scriptsize$[{-}0.097,+0.009]$} & ${-}0.203^{*}$ {\scriptsize$[{-}0.291,{-}0.119]$} & $+0.156^{*}$ {\scriptsize$[+0.084,+0.231]$} \\
+120 & 1 & $+0.109^{*}$ {\scriptsize$[+0.066,+0.156]$} & $+0.084^{*}$ {\scriptsize$[+0.044,+0.125]$} & $+0.003$ {\scriptsize$[{-}0.031,+0.041]$} & ${-}0.106^{*}$ {\scriptsize$[{-}0.162,{-}0.053]$} & $+0.091^{*}$ {\scriptsize$[+0.050,+0.137]$} \\
+120 & 0.25 & $+0.112^{*}$ {\scriptsize$[+0.041,+0.184]$} & $+0.081^{*}$ {\scriptsize$[+0.006,+0.156]$} & ${-}0.059^{*}$ {\scriptsize$[{-}0.103,{-}0.013]$} & ${-}0.172^{*}$ {\scriptsize$[{-}0.247,{-}0.094]$} & $+0.166^{*}$ {\scriptsize$[+0.109,+0.222]$} \\
+120 & 0.1 & $+0.084^{*}$ {\scriptsize$[+0.025,+0.147]$} & $+0.084^{*}$ {\scriptsize$[+0.028,+0.147]$} & $+0.013$ {\scriptsize$[{-}0.047,+0.072]$} & ${-}0.072^{*}$ {\scriptsize$[{-}0.128,{-}0.016]$} & $+0.022$ {\scriptsize$[{-}0.041,+0.081]$} \\
+\bottomrule
+\end{tabular}}
+\end{table}
+ 
+\subsection{E18: False structures on real slices}\label{sec:e18}
+Table~\ref{tab:absfb3} (CT rows) gives the mean number of false blobs per lesion-free slice at one times the nominal lesion strength for the four conditions that are also used in the shift study. On real slices all regularised methods make few such blobs: PnP-const $0.24$--$1.38$ per slice, TV-long $0.00$--$6.06$, FBP-Hann $5.8$--$26.8$.
+Over the nine conditions the paired difference PnP-const $-$ TV-long at $m=1$ (Table~\ref{tab:fb3}) is significantly positive in three ($K=60$ full dose: $+0.46$; $K=120$ full and quarter dose: $+0.24$, $+1.35$), significantly negative in three ($K=30$ quarter dose: $-5.31$; $K=60$ quarter dose: $-0.40$; $K=120$ dose 0.1: $-0.93$) and not significant in three, with no pattern in dose or angle count.
+At $m=1.5$ the excess of PnP-const over TV-long is at most $0.45$ blobs per slice (K=120, quarter dose). In the $K=60$ experiment (E17b, threshold $m=0.5$) PnP-const has fewer false blobs than TV at both doses ($-1.7$ at full dose, $-6.6$ at quarter dose).
+The overlays of the worst false blobs (\texttt{step4b\_gallery\_*.png}) show that the largest ones occur in FBP-Hann and TV as well, so they are produced by the data (few views, noise, streaks); only a few look specific to the prior, for example a crescent in one slice at full dose and streaks in the PnP-TVinit image of one slice at quarter dose.
+We therefore find \emph{no evidence that the prior creates many lesion-like structures in distribution}, but we cannot exclude rare ones: 40 slices and one noise draw per condition do not bound a rare event.
+ 
+\begin{table}[htbp]
+\centering\small\setlength{\tabcolsep}{3pt}
+\caption{Paired differences in false blobs per lesion-free slice on real CT slices (40 patients; mean, 95\% interval; $^*$ excludes 0), pooled over $\sigma_l\in\{2,4\}$; $m$: threshold in units of the nominal lesion response.}\label{tab:fb3}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{llccc}
+\toprule
+$K$ & dose & $m=1$: PnP-const $-$ TV-long & $m=1$: PnP-const $-$ TV & $m=1.5$: PnP-const $-$ TV-long\\
+\midrule
+30 & 1 & ${-}1.19$ {\scriptsize$[{-}2.79,+0.05]$} & ${-}0.54$ {\scriptsize$[{-}1.57,+0.36]$} & ${-}0.23$ {\scriptsize$[{-}0.64,+0.11]$} \\
+30 & 0.25 & ${-}5.31^{*}$ {\scriptsize$[{-}9.15,{-}2.31]$} & ${-}4.81^{*}$ {\scriptsize$[{-}8.41,{-}2.00]$} & ${-}2.42^{*}$ {\scriptsize$[{-}4.56,{-}0.82]$} \\
+30 & 0.1 & $+0.21$ {\scriptsize$[{-}0.20,+0.64]$} & $+0.31$ {\scriptsize$[{-}0.12,+0.76]$} & $+0.00$ {\scriptsize$[{-}0.14,+0.14]$} \\
+60 & 1 & $+0.46^{*}$ {\scriptsize$[+0.12,+0.88]$} & $+0.19^{*}$ {\scriptsize$[+0.01,+0.40]$} & $+0.12^{*}$ {\scriptsize$[+0.03,+0.25]$} \\
+60 & 0.25 & ${-}0.40^{*}$ {\scriptsize$[{-}0.68,{-}0.17]$} & ${-}0.60^{*}$ {\scriptsize$[{-}1.11,{-}0.19]$} & ${-}0.11^{*}$ {\scriptsize$[{-}0.25,{-}0.01]$} \\
+60 & 0.1 & ${-}0.07$ {\scriptsize$[{-}0.25,+0.07]$} & ${-}0.05$ {\scriptsize$[{-}0.20,+0.09]$} & ${-}0.01$ {\scriptsize$[{-}0.06,+0.04]$} \\
+120 & 1 & $+0.24^{*}$ {\scriptsize$[+0.04,+0.51]$} & $+0.11^{*}$ {\scriptsize$[+0.01,+0.25]$} & $+0.06$ {\scriptsize$[+0.00,+0.15]$} \\
+120 & 0.25 & $+1.35^{*}$ {\scriptsize$[+0.53,+2.30]$} & $+1.35^{*}$ {\scriptsize$[+0.54,+2.29]$} & $+0.45^{*}$ {\scriptsize$[+0.16,+0.81]$} \\
+120 & 0.1 & ${-}0.93^{*}$ {\scriptsize$[{-}1.50,{-}0.45]$} & ${-}0.88^{*}$ {\scriptsize$[{-}1.48,{-}0.39]$} & ${-}0.11^{*}$ {\scriptsize$[{-}0.26,{-}0.01]$} \\
+\bottomrule
+\end{tabular}}
+\end{table}
+ 
+\subsection{E19: Distribution shift to non-anatomical phantoms}\label{sec:e19}
+The CT-trained prior and all tuned parameters are applied, without retuning, to 20 random piecewise-constant phantoms (ellipses, rectangles and a stripe or checker block on a faint disc, $\mu/\mu_{\max}$ scale; nothing like a CT slice, but the kind of image TV favours; same phantoms in every condition) with the same lesion protocol. The shift was first run at $K=60$ (doses 1 and 0.25) and
+then extended to $K=30$ and $120$; the $K=60$ analysis used four lesion types, the others two, so the designs differ slightly.
+ 
+\emph{Accuracy and detection (Table~\ref{tab:shift3a}).} On the phantoms PnP-const is below TV-long in PSNR in all six conditions ($-0.11$ to $-0.75$\,dB; significantly in three of the four conditions for which an interval was computed) and in SSIM in all four ($-0.095$ to $-0.190$, all significant, against $-0.004$ to $-0.027$ on CT).
+At quarter dose its SSIM is also below FBP-Hann's on the phantoms ($-0.045$ at $K=30$ and $-0.041$ at $K=120$, both significant). The detection advantage over TV-long is significant in one of six shift conditions ($K=120$, full dose: $+0.075$, $[+0.013,+0.137]$), against three of the six corresponding CT conditions ($K=60$ quarter dose, $K=120$ at both doses);
+the shift effect is significantly negative only at $K=120$, quarter dose ($-0.175$, $[-0.297,-0.056]$). The CT advantage is therefore not reliably transferred to the shifted images, but at 20 phantoms the interval widths of $0.12$--$0.19$ do not allow us to say that it is lost either.
+ 
+\emph{False blobs (Tables~\ref{tab:shift3a}--\ref{tab:absfb3}).} The sign of PnP-const $-$ TV at $1\times$ lesion strength follows the number of angles: negative (or not different from zero) at $K=30$ and negative at full-dose $K=60$, mixed at $K=60$ quarter dose ($\sigma_l=2$: $-7.5$; $\sigma_l=4$: $+9.1$), and positive at $K=120$ ($+9.0$ to $+13.0$ per phantom at both doses; at $1.5\times$ against TV-long $+10.2$ at full dose and $+3.8$ at quarter dose, both significant).
+The absolute counts show why (Table~\ref{tab:absfb3}): the count of TV-long varies from $3.2$ to $83.9$ per phantom over the four conditions, that of PnP-const only from $12.8$ to $50.3$; at $K=30$ TV-long makes two to three times as many false blobs as FBP-Hann ($30.2$ vs.\ $15.5$ at quarter dose, $83.9$ vs.\ $31.6$ at full dose), at $K=120$ a third or less ($3.2$ vs.\ $8.7$; $32.1$ vs.\ $118.7$).
+So the ``excess'' of PnP-const at $K=120$ is relative to a TV that is unusually clean there. Relative to \emph{FBP-Hann} the picture is more informative: at full dose PnP-const has fewer false blobs on the phantoms ($-7.1$ at $K=30$, $-68.4$ at $K=120$, both significant), but at quarter dose it has more at both $K$ ($+1.0$, not significant, and $+4.0$ [$+2.4,+5.9$] at $1\times$;
+$+2.2$ [$+1.1,+3.4$] and $+2.7$ [$+1.4,+4.4$] at $1.5\times$), in contrast to real slices, where it has significantly fewer than FBP-Hann in both quarter-dose conditions ($-9.0$ and $-4.4$). In this sense the shift turns the prior from suppressing to adding false blobs relative to the unregularised reconstruction at quarter dose, by a few blobs per phantom. The pooled counts hide a dependence on lesion size: at $1\times$, for $\sigma_l=2$ PnP-const has more false blobs than FBP-Hann on the phantoms in three of the four conditions ($+10.1$, $+9.7$ and $+10.6$ at $K=30$ full and quarter dose and $K=120$ quarter dose, all significant), for $\sigma_l=4$ fewer in all four ($-24.3$, $-7.7$, $-30.9$, $-2.5$).
+At $K=120$, full dose, PnP-TVinit with almost no denoising ($\sigma_d=0.0039$) also produces $14.0$ more blobs than TV-long ($[+7.4,+22.0]$ at $1\times$, for all $\sigma_l$), so at least part of the excess at $K=120$ is not due to the denoiser; we did not isolate the cause.
+ 
+\begin{table}[htbp]
+\centering\small\setlength{\tabcolsep}{3pt}
+\caption{Distribution shift to phantoms (20 phantoms; mean, 95\% interval; $^*$ excludes 0). Left: false blobs per phantom at $1\times$ lesion strength, PnP-const $-$ TV, by lesion size. Right: PnP-const $-$ TV-long on the phantoms: pooled paired AUC, PSNR (dB) and SSIM.
+$K=60$ rows: AUC from four lesion types (E17b), PSNR as a difference of means without an interval, SSIM not computed.}\label{tab:shift3a}
+\resizebox{\linewidth}{!}{%
+\begin{tabular}{llcccccc}
+\toprule
+ & & \multicolumn{2}{c}{false blobs, $1\times$} & & & & \\
+\cmidrule(lr){3-4}
+$K$ & dose & $\sigma_l=2$ & $\sigma_l=4$ & AUC & PSNR & SSIM\\
+\midrule
+30 & 1 & ${-}70.7^{*}$ {\scriptsize$[{-}107.0,{-}38.7]$} & ${-}31.8^{*}$ {\scriptsize$[{-}48.7,{-}16.8]$} & ${-}0.037$ {\scriptsize$[{-}0.113,+0.037]$} & ${-}0.11$ {\scriptsize$[{-}0.37,+0.18]$} & ${-}0.095^{*}$ {\scriptsize$[{-}0.125,{-}0.063]$} \\
+30 & 0.25 & ${-}21.1^{*}$ {\scriptsize$[{-}34.3,{-}10.3]$} & ${-}1.8$ {\scriptsize$[{-}5.8,+1.8]$} & $+0.056$ {\scriptsize$[{-}0.031,+0.144]$} & ${-}0.53^{*}$ {\scriptsize$[{-}0.64,{-}0.40]$} & ${-}0.190^{*}$ {\scriptsize$[{-}0.204,{-}0.172]$} \\
+60 & 1 & ${-}20.1^{*}$ {\scriptsize$[{-}34.4,{-}7.6]$} & ${-}6.5^{*}$ {\scriptsize$[{-}12.6,{-}1.4]$} & ${-}0.019$ {\scriptsize$[{-}0.06,+0.02]$} & ${-}0.30$ (no interval) & n/a \\
+60 & 0.25 & ${-}7.5^{*}$ {\scriptsize$[{-}12.9,{-}2.8]$} & $+9.1^{*}$ {\scriptsize$[+6.0,+12.8]$} & $+0.050$ {\scriptsize$[{-}0.01,+0.11]$} & ${-}0.75$ (no interval) & n/a \\
+120 & 1 & $+13.0^{*}$ {\scriptsize$[+8.8,+17.5]$} & $+9.2^{*}$ {\scriptsize$[+5.4,+13.2]$} & $+0.075^{*}$ {\scriptsize$[+0.013,+0.137]$} & ${-}0.51^{*}$ {\scriptsize$[{-}0.56,{-}0.45]$} & ${-}0.179^{*}$ {\scriptsize$[{-}0.190,{-}0.168]$} \\
+120 & 0.25 & $+10.4^{*}$ {\scriptsize$[+5.9,+16.0]$} & $+9.0^{*}$ {\scriptsize$[+5.9,+12.3]$} & ${-}0.062$ {\scriptsize$[{-}0.162,+0.031]$} & ${-}0.62^{*}$ {\scriptsize$[{-}0.68,{-}0.57]$} & ${-}0.155^{*}$ {\scriptsize$[{-}0.162,{-}0.149]$} \\
+\bottomrule
+\end{tabular}}
+\end{table}
+ 
+\begin{table}[htbp]
+\centering\small\setlength{\tabcolsep}{4pt}
+\caption{Mean false blobs per lesion-free image at $1\times$ nominal lesion strength (mean of $\sigma_l=2$ and $4$) on real CT slices and on the phantoms, and PnP-const $-$ FBP-Hann (mean, 95\% interval over patients or phantoms).}\label{tab:absfb3}
+\begin{tabular}{llcccccc}
+\toprule
+set & $K$, dose & FBP-Hann & TV & TV-long & PnP-const & PnP-TVinit & PnP-const $-$ FBP\\
+\midrule
+CT     & 30, 0.25  & 9.78 & 5.56 & 6.06 & 0.75 & 0.64 & $-9.03^{*}$ {\scriptsize$[-13.21,-5.20]$}\\
+CT     & 30, 1     & 5.78 & 1.04 & 1.69 & 0.50 & 0.32 & $-5.28^{*}$ {\scriptsize$[-7.54,-3.29]$}\\
+CT     & 120, 0.25 & 5.79 & 0.02 & 0.02 & 1.38 & 0.39 & $-4.41^{*}$ {\scriptsize$[-7.34,-2.00]$}\\
+CT     & 120, 1    & 26.79 & 0.12 & 0.00 & 0.24 & 0.18 & $-26.55^{*}$ {\scriptsize$[-43.93,-12.63]$}\\
+phantom & 30, 0.25  & 15.48 & 27.95 & 30.20 & 16.50 & 11.65 & $+1.03$ {\scriptsize$[-0.68,+2.75]$}\\
+phantom & 30, 1     & 31.60 & 75.72 & 83.90 & 24.48 & 57.30 & $-7.13^{*}$ {\scriptsize$[-10.68,-4.02]$}\\
+phantom & 120, 0.25 & 8.72 & 3.08 & 3.18 & 12.75 & 11.48 & $+4.03^{*}$ {\scriptsize$[+2.35,+5.90]$}\\
+phantom & 120, 1    & 118.68 & 39.20 & 32.08 & 50.30 & 46.12 & $-68.38^{*}$ {\scriptsize$[-92.68,-45.23]$}\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+
+
+
 
 
 \section{Discussion}
 \label{sec:discussion}
 
-Seven findings emerge from this study.
+Ten findings emerge from this study.
  
 First, the learned prior's accuracy advantage over TV is conditional rather than universal. It is large and
 significant at moderate noise and for moderate undersampling ($\approx+3.9$\,dB at $\sigma=0.05$ with 20--40 angles),
@@ -998,6 +1298,23 @@ noise leaves the picture unchanged: the learned prior's gain over TV peaks at th
 of the PSNR-tuned prior in distribution is the same, and invention under mismatch is the same. The one new effect, a small rate of in-distribution false lesions at high noise, is a reminder that
 the failure mode of a learned prior moves with the noise level, so conclusions about hallucination should be stated for an operating regime. The weighted Poisson data term did not help, so the Gaussian approximation is adequate in this setting.
 
+Eighth, the advantage of the learned prior in PSNR does not carry over from the $28\times28$ benchmark to clinical-size CT. The $+3.9$\,dB over TV found with a matched prior on MNIST becomes $-0.93$ to $+0.33$\,dB over a TV tuned with twice the iterations on 362$\times$362 slices of 40 test patients, and the SSIM is lower in seven of nine conditions
+(Section~\ref{sec:e16}). Both iterative methods improve on FBP-Hann by $0.8$--$2.3$\,dB, so the gain over FBP comes from regularisation in general, not from the learned prior in particular, and a deeper denoiser did not change this at $K=60$ (Section~\ref{sec:e15}). We did not test why the small-scale and large-scale results differ; candidate explanations are the more varied anatomy
+(for which TV is a weaker model than for digits), a denoiser trained on only 8\,960 of the 35\,820 slices, the small number of PnP iterations, and a TV baseline that was tuned and given twice the iterations.
+ 
+Ninth, PSNR and detectability disagree, now in a different way from the small-scale results. In Stage 1 the PSNR-tuned PnP reconstruction detected lesions worse than TV; on CT it detects them better than TV in all nine conditions (significantly in six) but no better than unregularised FBP, and the PSNR-tuned TV is worse than FBP at detection in all nine conditions (significantly in seven)
+although it is $0.8$--$2.3$\,dB better in PSNR (Section~\ref{sec:e17}). A reconstruction method chosen on PSNR can therefore be the worse choice for a detection task, whichever method it is, and a comparison of learned and classical priors that reports only PSNR or SSIM would have ranked TV first and missed that the ranking of detectability is reversed. The lesions are small
+($\sigma_l=2$--$4$\,px) and of high contrast in the clinical sense; the conclusion for clinically low-contrast lesions, for other observers (for example channelised Hotelling) and for search tasks is untested.
+ 
+Tenth, the behaviour under distribution shift depends on the reconstruction condition, and the part that is common to all conditions is accuracy: on non-anatomical phantoms the learned prior is below TV in PSNR and SSIM in every condition tested, and its detection advantage is retained in one of six conditions. The number of false lesion-like blobs relative to TV changes sign
+with the number of angles, because the TV baseline's own count varies about 26-fold across conditions; relative to FBP-Hann the prior adds a few false blobs per phantom at quarter dose ($+1.0$ to $+4.0$ at $1\times$ lesion strength) and removes many at full dose. We therefore do not claim that the prior hallucinates in general or that it is safe: the evidence is that it does not create many lesion-like structures
+on real slices in distribution, and that under this shift it behaves as a moderately worse reconstructor whose false-blob count is neither consistently higher nor lower than that of its competitors.
+ 
+\emph{Answers to the guiding questions.} (1)~Does the learned prior keep its advantage over TV when the image distribution changes? Its detection advantage, the only one it had on real slices, is kept in one of six shift conditions, significantly smaller than on CT in one ($K=120$, quarter dose) and not significantly different from CT in the three other conditions where this was tested ($K=60$ was not tested); its PSNR and SSIM deficit against TV grows. (2)~Can we find cases where the method creates convincing but incorrect structures?
+Yes, at quarter dose on phantoms (a few blobs per phantom more than FBP-Hann, and in the $K=120$ conditions more than TV); not on real slices, where it creates fewer such blobs than FBP-Hann in all four conditions examined and at most 1.4 per slice at lesion strength. The structures it creates there are of the same kind that the data produce in FBP and TV.
+(3)~Do the conclusions hold over noise levels and reconstruction conditions? The sign of the detection advantage over TV does (nine of nine, significant in six); the conclusions on PSNR, SSIM and false blobs do not: their signs change with dose and angle count without a monotone trend.
+
+
 
 \section{Conclusion}
 \label{sec:conclusion}
@@ -1010,8 +1327,10 @@ under distribution shift. The reversal is caused by a mismatched prior rather th
 distribution beats TV on it, and the mismatched prior fills the weakly determined subspace with up to three times the true energy. In
 a task-based evaluation, the PSNR-tuned PnP reconstruction attenuates small lesions in distribution and invents lesion-like blobs under
 mismatch; re-tuning recovers TV-level detection only by giving up the PSNR advantage or by increasing false structure, except for a matched
-prior. The iteration used here lacks a stable, accurate fixed point, so early stopping acts as a regularizer. Future work should extend
-this study to larger, clinical-resolution data such as LoDoPaB-CT~\cite{leuschner2021} with patient-disjoint splits, patient-disjoint splits and clinical dose and geometry shifts (the matrix-free operator and Poisson model are now in place), and to provably convergent PnP variants and learned priors trained on diverse anatomy.
+prior. The iteration used here lacks a stable, accurate fixed point, so early stopping acts as a regularizer. On clinical-size CT from LoDoPaB, with patient-disjoint splits, nine dose and angle conditions and exact Poisson dose thinning, the learned prior does not improve on a well-tuned TV in PSNR or SSIM, but removes the detection deficit that PSNR-tuned TV has relative to filtered back-projection (AUC higher than TV in all nine conditions, equal to FBP-Hann within noise in seven).
+Under a shift to phantoms its accuracy deficit against TV is consistent and its detection advantage is mostly not demonstrable, and the number of invented lesion-like blobs is not systematically different from that of TV or FBP-Hann beyond a few per phantom at quarter dose.
+Future work should use all 60 test patients with several noise realisations, a finer TV and Hann grid, several denoiser seeds and the full training set, clinically calibrated lesion contrasts with model observers, and provably convergent PnP variants.
+
  
 
 \section*{Limitations}
@@ -1032,16 +1351,20 @@ and only moderate forward-model mismatches (up to $4^\circ$) were evaluated.
 and one MNIST-trained denoiser in the dose sweep, so the shift results of E12 carry no seed uncertainty; its Shepp--Logan result is one image and one noise draw per dose.
 The lesion study under Poisson noise inherits the limitations of E9, its TV baseline is a single run, and its observability analysis is exploratory and image-set dependent.
 The matrix-free operator was validated only against the dense operator at $28\times28$, not at clinical size, where the cost of the matrix-free TV solver will have to be reduced.
-
+The CT study uses 40 test patients (one slice each) and one noise realisation per condition, so a single cell has an AUC uncertainty of about $\pm0.05$ and the apparent pattern across the nine conditions rests on sign consistency; the conditions share the same patients and are not independent. No correction for multiplicity was applied, the
+analysis was developed in steps after seeing results (Section~\ref{sec:history3}), and the shift extension was chosen after the $K=60$ results. One denoiser architecture and one training run were used, with 8\,960 of the 35\,820 training slices, so the comparison does not separate the prior from this particular network. TV is tuned on a grid with steps of a factor three, TV-long is
+sometimes worse than TV, and PSNR was the tuning criterion for every method, which favours accuracy over detectability. Two optima of PnP-TVinit lie on the boundary of the grid. The simulator was checked against real data on 8 slices per condition and agrees within $0.15$\,dB in TV PSNR, but the real data have more variance than the simulation at high counts.
+The lesions are additive Gaussian blobs of 120--240\,HU under an assumed mapping from $\mu/\mu_{\max}$ to HU, the observer is a location-known statistic, false blobs are defined by this statistic and a threshold, and no reader study was done. The phantoms are piecewise constant, which favours TV; the shift study covers a single kind of shift and no change of scanner geometry or dose model.
+The $K=60$ shift analysis used four lesion types and the other conditions two; PSNR on the phantoms at $K=60$ is reported without an interval. The DnCNN has no convergence guarantee and the number of iterations acts as a regulariser.
 
 
 \section*{Reproducibility}
 Code, trained models, all raw result files and figures are available at
 \url{https://github.com/AboOraig/learned-regularization}. The experiments of this version are run, in order, by
 \texttt{run\_nullspace.py} (E6, E7), \texttt{run\_spectral.py} (iteration and spectral analysis), \texttt{run\_step4.py} and
-\texttt{summarize\_step4.py} (E8), \texttt{run\_lesions.py} and \texttt{summarize\_step5.py} (E9), and \texttt{run\_oppoint.py} (E10);
-the unit tests are run with \texttt{python -m pytest tests};
-\texttt{run\_stage2.py} (E11, E12) and \texttt{run\_lesions\_poisson.py} with \texttt{summarize\_step5.py} (E13); the unit tests (44 in total) run with \texttt{python -m pytest tests}.
+\texttt{summarize\_step4.py} (E8), \texttt{run\_lesions.py} and \texttt{summarize\_step5.py} (E9), and \texttt{run\_oppoint.py} (E10); \texttt{run\_stage2.py} (E11, E12) and \texttt{run\_lesions\_poisson.py} with \texttt{summarize\_step5.py} (E13); \texttt{run\_stage3\_step1.py} (data, patient split, geometry, E14), \texttt{run\_stage3\_step2.py} (noise model, FBP and TV baselines, extraction of training slices), \texttt{train\_denoiser\_ct.py} (denoiser), \texttt{run\_stage3\_step3.py} and \texttt{run\_stage3\_step3b.py} (E15; the first is superseded),
+\texttt{run\_stage3\_step4.py}, \texttt{run\_stage3\_step4b.py} and \texttt{run\_stage3\_step4c\_compare.py} (E17b, E18, E19 at $K=60$; use \texttt{--out results/stage3/s4c --n\_val 20 --auto\_extend 2} for the final version), \texttt{run\_stage3\_step5.py} and \texttt{run\_stage3\_step5\_summary.py} (E16--E18), and
+\texttt{run\_stage3\_step5\_shift.py} with \texttt{run\_stage3\_step5\_shift\_summary.py} (E19 at $K=30,120$); the unit tests (68 in total) run with \texttt{python -m pytest tests}.
 
 
 
