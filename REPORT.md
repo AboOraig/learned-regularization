@@ -1,4 +1,4 @@
-# Learned Regularization for Robust Image Reconstruction: Full Report
+# Learned Regularization for Robust Image Reconstruction:
 
 This report documents every experiment of the project in three stages, with
 tables, statistical tests and limitations. The short version, headline table
