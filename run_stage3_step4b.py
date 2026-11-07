@@ -150,8 +150,8 @@ for f in fl(a.doses):
                     ax.add_patch(plt.Circle((cx - x0, cy - y0), 8, fill=False, color="r", lw=0.8))
                     ax.set_title(lab if row % a.n_gal == 0 and False else (f"{lab}" + (f"  [{who}: {val:.2f}x nominal]" if lab == who else "")), fontsize=7)
                 axs[row, 0].set_ylabel(f"worst {who}\nimg {img}", fontsize=7)
-        fig.suptitle(f"{name}, dose {f:g}: strongest UNSUPPORTED blob (sigma_l=4 detector, nominal = contrast 0.06 lesion); window = 0.5-99.5% of truth+recon crops", fontsize=8)
-        fig.tight_layout(); fig.savefig(f"{a.out}/step4b_gallery_{name}_dose{f:g}.png", dpi=110); plt.close(fig)
+        fig.suptitle(f"{name}, dose {f:g}: strongest UNSUPPORTED blob (sigma_l=4 detector, nominal = contrast 0.06 lesion); window = 0.5-99.5% of truth+recon crops", fontsize=8, y=0.997)
+        fig.tight_layout(rect=[0, 0, 1, 0.985]); fig.savefig(f"{a.out}/step4b_gallery_{name}_dose{f:g}.png", dpi=110); plt.close(fig)
         # consistency check against step 4 (m = 0.5 must reproduce its false-lesion counts)
         fn = f"{a.out}/step4_{name}_dose{f:g}.npz"
         if os.path.exists(fn):

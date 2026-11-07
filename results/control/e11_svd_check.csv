@@ -1,0 +1,15 @@
+item,value
+"max |s_i - s_i(dense)| / s_1, first 400",0.00011034728231607005
+"max |s_i - s_i(dense)| / s_1, first 600",6.2327686464414e-05
+"dim strong subspace, matrix-free",465.0
+"dim strong subspace, dense",465.0
+largest principal angle between strong subspaces (sin),0.0
+"strong-error difference / ||e||, Tikhonov: max over images",0.0002279846230521798
+"strong-error difference / ||e||, Tikhonov: mean",0.0002211423561675474
+"strong share of error energy, Tikhonov (dense)",0.9065532088279724
+"strong-error difference / ||e||, TV-ADMM: max over images",0.00022589149011764675
+"strong-error difference / ||e||, TV-ADMM: mean",0.00021275811013765633
+"strong share of error energy, TV-ADMM (dense)",0.8236016631126404
+"strong-error difference / ||e||, PnP(k=25): max over images",0.00021765903511550277
+"strong-error difference / ||e||, PnP(k=25): mean",0.00020297746232245117
+"strong share of error energy, PnP(k=25) (dense)",0.7685064673423767

@@ -75,6 +75,6 @@ for ax, (met, A, B, unit) in zip(axs, panels):
     ax.set_title(f"{met}: {A} - {B} {unit}", fontsize=9)
 for ax in axs[len(panels):]:
     ax.axis("off")
-fig.suptitle("Paired differences by condition (* = 95% interval over patients excludes 0; red = first method higher)", fontsize=10)
+fig.suptitle("Paired differences by condition (* = 95% interval over patients excludes 0; blue = first method higher)", fontsize=10)
 fig.tight_layout(); fig.savefig(f"{a.dir}/step5_grid.png", dpi=120)
 print(f"\nwrote {a.dir}/step5_means.csv, step5_paired.csv, step5_grid.png")
