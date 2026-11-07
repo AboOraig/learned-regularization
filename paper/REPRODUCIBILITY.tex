@@ -1,0 +1,10 @@
+% =====================================================
+\section*{Reproducibility}
+% =====================================================
+Code, trained models, all raw result files and figures are available at
+\url{https://github.com/AboOraig/learned-regularization}. The experiments of this version are run, in order, by
+\texttt{run\_nullspace.py} (E6, E7), \texttt{run\_spectral.py} (iteration and spectral analysis), \texttt{run\_step4.py} and
+\texttt{summarize\_step4.py} (E8), \texttt{run\_lesions.py} and \texttt{summarize\_step5.py} (E9), and \texttt{run\_oppoint.py} (E10); \texttt{run\_stage2.py} (E11, E12) and \texttt{run\_lesions\_poisson.py} with \texttt{summarize\_step5.py} (E13); \texttt{run\_stage3\_step1.py} (data, patient split, geometry, E14), \texttt{run\_stage3\_step2.py} (noise model, FBP and TV baselines, extraction of training slices), \texttt{train\_denoiser\_ct.py} (denoiser), \texttt{run\_stage3\_step3.py} and \texttt{run\_stage3\_step3b.py} (E15; the first is superseded),
+\texttt{run\_stage3\_step4.py}, \texttt{run\_stage3\_step4b.py} and \texttt{run\_stage3\_step4c\_compare.py} (E17b, E18, E19 at $K=60$; use \texttt{--out results/stage3/s4c --n\_val 20 --auto\_extend 2} for the final version), \texttt{run\_stage3\_step5.py} and \texttt{run\_stage3\_step5\_summary.py} (E16--E18), and
+\texttt{run\_stage3\_step5\_shift.py} with \texttt{run\_stage3\_step5\_shift\_summary.py} (E19 at $K=30,120$). The controls added in this version are
+\texttt{run\_tv\_box\_control.py} (E1--E2 box-constrained TV), \texttt{run\_tv\_box\_shift.py} (E4, E8), \texttt{run\_tv\_box\_lesions.py} (E9), \texttt{run\_e3\_rotation\_check.py} (E3), \texttt{run\_e11\_svd\_check.py} (E11) and \texttt{run\_e19\_k60\_psnr\_ci.py} (E19); the figures of E1--E2 and E5 are drawn from the stored result files by \texttt{make\_fig\_e1e2\_gap.py} and \texttt{make\_fig\_e5\_iterations.py}. The unit tests (68 in total) run with \texttt{python -m pytest tests}.
