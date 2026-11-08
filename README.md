@@ -8,7 +8,7 @@ FBP, Tikhonov and total-variation (TV) regularization under noise, undersampling
 shift and a lesion-detection task, first on 28x28 digit images and then on real clinical-size CT slices (LoDoPaB-CT).
 
 - **Paper:** [paper/Learned_Regularization.pdf](paper/Learned_Regularization.pdf) (source: `paper/main.tex`). Preprint link: *to be added*.
-- **Full write-up of every experiment:** [REPORT.md](REPORT.md).
+- **Results companion: one card per experiment:** [REPORT.md](REPORT.md).
 - **Everything is reproducible from this repository:** code, trained models, raw per-image results and figure scripts.
 
 > **One-sentence result.** The learned prior is about 3.4 dB better than a box-constrained TV on 28x28 digits at moderate noise,
