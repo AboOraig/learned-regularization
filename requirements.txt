@@ -1,7 +1,14 @@
+# Core (all stages)
 numpy
 scipy
 scikit-image
-torch
+torch          # tested with 2.5.1 (CUDA 12.1); install the build matching your GPU from pytorch.org
 torchvision
 matplotlib
 pandas
+
+# Stage 3 (real LoDoPaB-CT data)
+h5py
+
+# Tests (python -m pytest tests -q)
+pytest

@@ -1,3 +1,21 @@
 data/
 __pycache__/
 *.py[cod]
+
+# LaTeX build files
+paper/*.aux
+paper/*.log
+paper/*.bbl
+paper/*.blg
+paper/*.out
+paper/*.toc
+paper/*.synctex.gz
+paper/*.fdb_latexmk
+paper/*.fls
+
+# Tools and OS
+.pytest_cache/
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
