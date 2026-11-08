@@ -245,17 +245,4 @@ The study is deliberately small and conditional, and the paper's Limitations sec
 - Lesions are additive Gaussian blobs with a location-known observer; there was no reader study, and clinically low-contrast lesions were not tested.
 - The CT simulator was validated on 8 slices for the TV baseline only; the phantom shift is a single, TV-friendly kind of shift.
 
-## Citation and contact
-
-If you use this work, please cite the preprint (link to be added):
-
-```
-@misc{aboOraig2026learned,
-  title  = {<title of the paper, as in main.tex>},
-  author = {Abo Oraig, Mohammed},
-  year   = {2026},
-  note   = {Preprint}
-}
-```
-
 Author: Mohammed Abo Oraig (independent research). Questions and issues: please open a GitHub issue.
