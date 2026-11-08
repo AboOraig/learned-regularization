@@ -1,5 +1,7 @@
 # Learned Regularization for Robust Image Reconstruction
 
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+
 A controlled study of when a **learned image prior** helps sparse-view CT reconstruction, and when it does not.
 A noise-conditioned DnCNN denoiser is used as a Plug-and-Play (PnP) prior inside proximal gradient and compared with
 FBP, Tikhonov and total-variation (TV) regularization under noise, undersampling, forward-model error, distribution
