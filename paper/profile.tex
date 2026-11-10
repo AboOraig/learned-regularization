@@ -1,0 +1,59 @@
+\documentclass[10pt,a4paper]{article}
+\usepackage[T1]{fontenc}
+\usepackage[top=0.5in,bottom=0.5in,left=0.55in,right=0.55in]{geometry}
+\usepackage{enumitem}
+\usepackage[hidelinks]{hyperref}
+\usepackage{titlesec}
+
+\setlist[itemize]{leftmargin=1.2em,noitemsep,topsep=2pt,parsep=0pt,partopsep=0pt}
+\titleformat{\section}{\normalsize\bfseries}{}{0em}{}[\titlerule]
+
+\begin{document}
+\pagestyle{empty}
+
+%====================
+% HEADER
+%====================
+\begin{center}
+    {\Large \textbf{Learned Regularization for Sparse-View CT:}}\\
+    {\large Accuracy, Lesion Detectability and Distribution Shift of a\\
+    Plug-and-Play Prior against Tuned Total Variation}
+\end{center}
+%{\large \textbf{When does a learned prior help sparse-view CT, and when does it not?}}\\[0.2cm]
+Mohammed Abo Oraig \quad\textbar\quad \href{mailto:mohammed-abo-oraig@etud.univ-tln.fr}{\underline{mohammed-abo-oraig@etud.univ-tln.fr}} \\
+Code: \href{https://github.com/AboOraig/learned-regularization}{\underline{github.com/AboOraig/learned-regularization}}
+
+\section*{Question}
+Plug-and-Play (PnP) reconstruction with a learned denoiser is often reported to beat classical regularisers such as total variation (TV) in PSNR.
+This study asks three questions under controlled conditions: \textbf{Q1} does the advantage survive a change in image distribution,
+\textbf{Q2} can the method create lesion-like structure that the ground truth does not support, and \textbf{Q3} do the conclusions hold across noise levels and acquisition settings?
+
+\section*{Approach}
+A noise-conditioned DnCNN is used as the prior in PnP proximal gradient and compared with FBP, Tikhonov and TV (unconstrained and box-constrained), each tuned on validation data.
+Three stages of increasing realism: 28$\times$28 digits with Gaussian noise; Poisson noise with a matrix-free operator validated against the dense one;
+and LoDoPaB-CT slices (362$\times$362, patient-disjoint split, simulated low-dose measurements, 30/60/120 of 1000 angles, three doses, 40 test patients).
+Beyond PSNR/SSIM the study uses (i) a singular-vector decomposition of the error into well- and weakly-determined components, (ii) controlled lesion insertion with a location-known observer (paired AUC, lesion retention, false blobs),
+and (iii) controls against evaluation artefacts: the inverse crime, a box-constrained TV baseline, independent denoiser seeds and a matched-prior control.
+Statistics are paired; bootstrap intervals over patients on CT.
+
+\section*{Main findings}
+\begin{itemize}
+\item \textbf{The advantage is real but conditional.} On digits the prior is about 3.4\,dB above a box-constrained TV at moderate noise; it shrinks at both ends of the noise range, and near $\sigma=0$ the ranking depends on the data model and the TV solver.
+\item \textbf{It reverses under far distribution shift, and the cause is prior mismatch.} An MNIST-trained prior is $3.10\pm0.30$\,dB (Fashion-MNIST) and $4.33\pm0.12$\,dB (phantom) \emph{below} unconstrained TV (mean $\pm$ s.d., three seeds; against box-constrained TV: $3.13$ and $4.55$\,dB), while a Fashion-trained prior is $2.21$\,dB \emph{above} TV on Fashion-MNIST with identical hyper-parameters.
+\item \textbf{PSNR does not predict detectability.} In distribution the prior is $3$--$4$\,dB better in PSNR yet detects inserted lesions worse than TV because it attenuates them; under mismatch it creates more false lesions than box-constrained TV for seven of eight lesion types (TV's own false-blob count is unstable). Re-tuning trades one failure for the other.
+\item \textbf{On CT slices the accuracy advantage disappears.} Against a TV run for 300 iterations, PnP differs by $-0.93$ to $+0.33$\,dB over nine dose$\times$angle conditions (SSIM lower in 8 of 9). Its lesion-detection AUC is higher than that TV's in all nine conditions (significant in six), but never significantly higher than plain FBP, and the PSNR-tuned TV is \emph{below} FBP at detection in all nine (seven significant).
+\item \textbf{False structures on CT slices} mostly appear at the same locations in FBP, TV and PnP, which suggests that they come from the data rather than the prior; on non-anatomical phantoms PnP's PSNR is below TV in all six conditions.
+\end{itemize}
+
+\section*{What I contributed and what I did not claim}
+Design and implementation of the pipeline (operators with exact adjoints, solvers, simulators, observer, unit tests), the experimental protocol and the analysis. The code is released with the stored results.
+An AI assistant (Claude) helped develop the code and, later, to edit the text; the research questions, experiments, interpretation and conclusions are mine, as the paper's disclosure states.
+The paper states its limits explicitly: one small denoiser and one CT training run, 28$\times$28 images for the thorough grid, 40 CT patients with one noise realisation per condition, synthetic lesions and no reader study, and no multiplicity correction.
+Part of the CT analysis was developed after seeing results (documented in the paper); nothing was pre-registered.
+
+\section*{Skills demonstrated}
+Variational and learned regularisation for inverse problems; PnP and variational solvers (ADMM, primal--dual); PyTorch and matrix-free GPU implementation on a 4\,GB card; careful statistical evaluation and controls; reproducible research software.
+
+\section*{Where this leads}
+Open questions the study leaves: isolating why the detection sign differs between digits and CT; testing convergence-guaranteed or score-based priors under the same protocol; clinically low-contrast lesions with a reader study.
+\end{document}

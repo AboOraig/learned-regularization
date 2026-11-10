@@ -5,12 +5,14 @@
 
 \subsection{Problem setting and experimental settings}\label{sec:settings}
 We reconstruct an image $x\in\mathbb{R}^n$ from measurements $y=Ax+n$, where $A$ is a parallel-beam Radon transform with $K$ projection angles evenly spaced in $[0^\circ,180^\circ)$.
-The study uses three settings, summarised in Table~\ref{tab:settings}; Stage~1 and~2 use synthetic $28\times28$ digit images so that every factor can be varied and repeated, and Stage~3 uses real CT slices.
-All methods in a comparison receive the same data, the same operator and the same validation-based tuning budget.
- 
+The study uses three settings, summarised in Table~\ref{tab:settings}; Stages~1 and~2 use synthetic $28\times28$ digit images so that every factor can be varied and repeated, and Stage~3 uses real CT slices.
+All methods in a comparison receive the same data, the same operator and the same validation images for tuning; the number of tuned parameters differs between methods (Section~\ref{sec:protocol12}).
+
 \begin{table}[htbp]
 \centering\small\setlength{\tabcolsep}{4pt}
-\caption{The three settings of the study.}\label{tab:settings}
+\caption{The three settings of the study. Datasets: MNIST~\citep{lecun1998mnist},
+Fashion-MNIST~\citep{xiao2017fashion}, EMNIST letters~\citep{cohen2017emnist},
+the Shepp--Logan phantom~\citep{shepp1974} and LoDoPaB-CT~\citep{leuschner2021}.}\label{tab:settings}
 \begin{tabular}{p{2.3cm}p{2.6cm}p{3.6cm}p{3.2cm}p{3.0cm}}
 \toprule
 Setting & Images & Operator and noise & Data used & Experiments\\
@@ -23,10 +25,10 @@ LoDoPaB-CT (Stage 3) & $362\times362$ slices & matrix-free parallel-beam, 513 bi
 \end{table}
 
 \subsection{Forward operator and classical baselines (Stages 1--2)}
-For the digit images, $A\in\mathbb{R}^{m\times n}$ is stored as an explicit dense matrix: the discrete Radon transform of scikit-image (\texttt{radon}, \texttt{circle=False}) is applied to each of the $n=784$ canonical basis images and the sinograms are stacked as columns.
+For the digit images, $A\in\mathbb{R}^{m\times n}$ is stored as an explicit dense matrix: the discrete Radon transform of scikit-image~\citep{vanderwalt2014skimage} (\texttt{radon}, \texttt{circle=False}) is applied to each of the $n=784$ canonical basis images and the sinograms are stacked as columns.
 The detector has 40 bins, so $m=40K$ ($800\times784$ for $K=20$). $A$ is divided by the image size $28$ so that sinogram values are of order one; the Gaussian noise standard deviation $\sigma$ is defined on this normalised sinogram, $y=Ax+\sigma\varepsilon$ with $\varepsilon\sim\mathcal{N}(0,I)$.
 The dense matrix gives the exact adjoint $A^\top$, which matters for the PnP gradient step, and allows the reconstruction operator to be perturbed independently of the data-generating operator in the mismatch experiments.
- 
+
 \textbf{Filtered back-projection (FBP)} uses the ramp filter of scikit-image (\texttt{iradon}); it has no tunable parameter and is not regularised. \textbf{Tikhonov regularization} solves
 \begin{equation}
 \hat{x} = \arg\min_x \tfrac{1}{2}\lVert Ax-y\rVert_2^2 + \tfrac{\lambda}{2}\lVert x\rVert_2^2
@@ -36,46 +38,45 @@ in closed form. \textbf{Total variation} solves
 \begin{equation}
 \hat{x} = \arg\min_x \tfrac{1}{2}\lVert Ax - y\rVert_2^2 + \lambda \, \mathrm{TV}(x)
 \end{equation}
-by ADMM with an isotropic TV penalty, forward differences $D$ with Neumann boundary conditions, the splitting $z=Dx$, a fixed penalty parameter $\rho=0.05$, 100 iterations and the $x$-update computed with a precomputed inverse.
-The Tikhonov and ADMM-TV solutions are not constrained to $[0,1]$; all reconstructions in Stages 1--2 are clipped to $[0,1]$ before the metrics are computed.
+by ADMM~\citep{boyd2011admm} (\emph{TV-ADMM}) with an isotropic TV penalty, forward differences $D$ with Neumann boundary conditions, the splitting $z=Dx$, a fixed penalty parameter $\rho=0.05$, 100 iterations and the $x$-update computed with a precomputed inverse.
+The Tikhonov and TV-ADMM solutions are not constrained to $[0,1]$; all reconstructions in Stages~1--2 are clipped to $[0,1]$ before the metrics are computed.
 
 \subsection{Learned prior: PnP proximal gradient}\label{sec:pnp}
-\textbf{Denoiser.} $D_\sigma$ is a DnCNN-style residual network that also receives the noise level: the input has two channels, the image and a constant map equal to $\sigma$ (as in FFDNet), followed by 8 convolutional layers of $3\times3$ kernels with 64 channels, ReLU activations and batch normalisation in the hidden layers; the output is $x-\mathrm{net}(x,\sigma)$ (residual learning).
-For Stages 1--2 it is trained on clean MNIST images (the training split without 500 held-out images, 59\,500 images) corrupted by Gaussian noise with $\sigma\sim\mathcal{U}(0,\sigma_{\max})$, $\sigma_{\max}=0.3$, with the $\ell_2$ loss, Adam (learning rate $10^{-3}$), batch size 128 and 8 epochs with a cosine schedule.
+\textbf{Denoiser.} $D_\sigma$ is a DnCNN-style~\citep{zhang2017dncnn} residual network that also receives the noise level: the input has two channels, the image and a constant map equal to $\sigma$ (as in FFDNet~\citep{zhang2018ffdnet}), followed by 8 convolutional layers of $3\times3$ kernels with 64 channels, ReLU activations and batch normalisation in the hidden layers; the output is $x-\mathrm{net}(x,\sigma)$ (residual learning).
+For Stages~1--2 it is trained on clean MNIST images (the training split without 500 held-out images, 59\,500 images) corrupted by Gaussian noise with $\sigma\sim\mathcal{U}(0,\sigma_{\max})$, $\sigma_{\max}=0.3$, with the $\ell_2$ loss, Adam~\citep{kingma2015adam} (learning rate $10^{-3}$), batch size 128 and 8 epochs with a cosine schedule.
 One trained network serves all PnP experiments; $\sigma_d$, the noise level passed to the network at inference, is a tuned hyperparameter that is distinct from the training noise range. At inference the network is in evaluation mode and its output is clipped to $[0,1]$.
- 
+
 \textbf{Iteration.} Reconstruction replaces the proximal operator of an explicit regularizer by the denoiser,
 \begin{equation}
-x_{k+1} = D_{\sigma_d}\big(x_k - \eta \, A^\top(Ax_k - y)\big), \qquad
+x_{t+1} = D_{\sigma_d}\big(x_t - \eta \, A^\top(Ax_t - y)\big), \qquad
 \eta = 1/L(A^\top A),
 \end{equation}
-where $L(A^\top A)$ is the largest eigenvalue of $A^\top A$, estimated by power iteration. Algorithm~\ref{alg:pnp} summarises the procedure; in Stages 1--2 the initial image is the FBP reconstruction.
-Both the initial image and every iterate are clipped to $[0,1]$ (the denoiser output is clipped, which acts as a box constraint). The ADMM-TV and Tikhonov baselines of Stages 1--2 have no such constraint inside the iteration; as a control we re-ran the key digit-image comparisons with a box-constrained TV (Chambolle--Pock, $0\le x\le 1$, 1000 iterations, $\lambda$ tuned on the same validation set; \emph{TV-box}). The control covers the noise and angle sweeps (E2b), the distribution-shift and matched-prior matrix (E4/E8) and the lesion study (E9); the other Stage~1--2 experiments (E3, E5, E7, E10 and the Stage~2 dose sweep) use the unconstrained ADMM-TV only. Every claim below states which TV it refers to. In Stage~3 the TV baseline is box-constrained.
- 
+where $L(A^\top A)$ is the largest eigenvalue of $A^\top A$, estimated by power iteration, and the output is $x_k$ after $k$ iterations (a tuned hyperparameter). Algorithm~\ref{alg:pnp} summarises the procedure; in Stages~1--2 the initial image is the FBP reconstruction.
+Both the initial image and every iterate are clipped to $[0,1]$ (the denoiser output is clipped, which acts as a box constraint). The TV-ADMM and Tikhonov baselines of Stages~1--2 have no such constraint inside the iteration, and TV has a fixed iteration count (100 ADMM iterations) while the PnP count $k$ is tuned. As a control we re-ran the key digit-image comparisons with a box-constrained TV (Chambolle--Pock~\citep{chambolle2011}, $0\le x\le 1$, 1000 iterations, $\lambda$ tuned on the same validation set; \emph{TV-box}). The control covers the noise and angle sweeps (E2b), the distribution-shift and matched-prior matrix (E4/E8) and the lesion study (E9); the other Stage~1--2 experiments (E3, E5, E7, E10 and the Stage~2 dose sweep) use TV-ADMM only. Every claim below states which TV it refers to. In Stage~3 the TV baseline is box-constrained.
+
 \begin{algorithm}[htbp]
 \caption{PnP proximal gradient (PnP-PGD)}
 \label{alg:pnp}
 \begin{algorithmic}[1]
-\Require measurements $y$, operator $A$, denoiser $D$, strength $\sigma_d$, step $\eta$, iterations $K$, initial image $x_0$
+\Require measurements $y$, operator $A$, denoiser $D$, strength $\sigma_d$, step $\eta$, number of iterations $k$, initial image $x_0$
 \State $x_0 \gets \mathrm{clip}_{[0,1]}(x_0)$
-\For{$k = 0, \dots, K-1$}
-  \State $g_k \gets A^\top(Ax_k - y)$
-  \State $x_{k+1} \gets \mathrm{clip}_{[0,1]}\bigl(D_{\sigma_d}(x_k - \eta \, g_k)\bigr)$
+\For{$t = 0, \dots, k-1$}
+  \State $g_t \gets A^\top(Ax_t - y)$
+  \State $x_{t+1} \gets \mathrm{clip}_{[0,1]}\bigl(D_{\sigma_d}(x_t - \eta \, g_t)\bigr)$
 \EndFor
-\State \Return $x_K$
+\State \Return $x_k$
 \end{algorithmic}
 \end{algorithm}
 
-\subsection{Evaluation protocol (Stages 1--2)}
-Data are split into disjoint training, validation and test subsets (Table~\ref{tab:settings}). The hyperparameters, $\lambda$ for Tikhonov and TV and $(\sigma_d,K)$ for PnP, are selected by grid search maximising the mean validation PSNR, independently for each experimental condition (noise level, number of angles or dose) in E1, E2 and E12, and then evaluated once on the test set.
-The grids are $\lambda_{\rm Tik}\in10^{[-5,0]}$ (21 log-spaced values), $\lambda_{\rm TV}\in10^{[-5,-1]}$ (17 values), $\sigma_d\in\{0.005,0.01,0.02,0.05,0.1,0.15,0.2,0.3\}$ (extended to 0.5 for the denoisers of Section~\ref{sec:seeds}) and $K\in\{0,1,2,3,5,10,25,50,100,200,400\}$, where $K=0$ means one application of the denoiser to the FBP image.
+\subsection{Evaluation protocol (Stages 1--2)}\label{sec:protocol12}
+Data are split into disjoint training, validation and test subsets (Table~\ref{tab:settings}). The hyperparameters, $\lambda$ for Tikhonov and TV and $(\sigma_d,k)$ for PnP, are selected by grid search maximising the mean validation PSNR, independently for each experimental condition (noise level, number of angles or dose) in E1, E2 and E12, and then evaluated once on the test set.
+The grids are $\lambda_{\rm Tik}\in10^{[-5,0]}$ (21 log-spaced values), $\lambda_{\rm TV}\in10^{[-5,-1]}$ (17 values), $\sigma_d\in\{0.005,0.01,0.02,0.05,0.1,0.15,0.2,0.3\}$ (extended to 0.5 for the denoisers of Section~\ref{sec:seeds}) and $k\in\{0,1,2,3,5,10,25,50,100,200,400\}$; PnP therefore has 88 grid points against 17 for TV. The value $k=0$ is a special case that applies the denoiser once to the FBP image, without a data-fidelity step.
 For the robustness experiments (E3, E4) the hyperparameters are tuned once at a nominal condition and \emph{frozen} across all mismatch and shift conditions, as in a deployed pipeline that is not retuned for every operating condition.
-PSNR (peak 1) and SSIM (scikit-image, $7\times7$ window, data range 1) are computed on the clipped reconstruction. Every condition uses one noise realisation per image (validation and test noise are drawn with different seeds).
-We report the mean with a 95\% interval of $\pm1.96$ standard errors over test images and use a two-sided paired Wilcoxon signed-rank test between PnP and TV on the same images and noise realisations.
- 
+PSNR (peak 1) and SSIM~\citep{wang2004} (scikit-image implementation, $7\times7$ window, data range 1) are computed on the clipped reconstruction. Every condition uses one noise realisation per image (validation and test noise are drawn with different seeds).
+We report the mean with a 95\% interval, $\pm1.96$ standard errors over test images, and use a two-sided paired Wilcoxon signed-rank test between PnP and TV on the same images and noise realisations. Where a table reports a paired gap with a bootstrap interval, or seed-to-seed variation as a standard deviation over denoisers, its caption says so.
+
 \subsection{Data simulated on a finer grid}\label{sec:crimefree}
-In E1--E5 the data are generated with the matrix $A$ used for reconstruction (an ``inverse crime''~\cite{wirgin2004,kaipio2005}). For the experiments of Sections~\ref{sec:crime-results}--\ref{sec:oppoint-results}
-we instead simulate measurements on a finer grid. The $28\times28$ image $x$ is upsampled by an odd integer
+In E1--E5 the data are generated with the matrix $A$ used for reconstruction (an ``inverse crime''~\citep{wirgin2004,kaipio2005}), except where a finer-grid repeat is stated (Table~\ref{tab:e1e2gap}). For the later digit experiments (Sections~\ref{sec:crime-results}--\ref{sec:oppoint-results}) we instead simulate measurements on a finer grid, which reduces the inverse crime but does not remove it. The $28\times28$ image $x$ is upsampled by an odd integer
 factor $f=5$ (to $140\times140$) with bicubic interpolation and clipped to $[0,1]$, projected with the same
 discrete Radon transform at the same angles, and every $f$ adjacent detector bins are summed onto the 40-bin
 detector of the reconstruction operator, giving $y=\mathcal{S}(x)+n$ with $\mathcal{S}\neq A$. Reconstructions use
@@ -90,11 +91,10 @@ re-tuned on validation data simulated in the same way.
 Besides the single MNIST denoiser of Section~\ref{sec:pnp} we train, with the same architecture and
 optimiser: (i) three MNIST denoisers with $\sigma_{\max}=0.3$ (seeds 0--2);
 (ii) three MNIST denoisers with $\sigma_{\max}=0.5$, which allows $\sigma_d$ up to $0.5$ and removes the grid-edge
-tuning at $\sigma=0.2$ observed in E1; (iii) three denoisers trained on the Fashion-MNIST training split
-($\sigma_{\max}=0.3$). In the matched-prior control, all methods (Tikhonov, TV, PnP) are tuned on held-out
+tuning at $\sigma=0.2$ observed in E1; (iii) three denoisers trained on the Fashion-MNIST~\citep{xiao2017fashion} training split ($\sigma_{\max}=0.3$). In the matched-prior control, all methods (Tikhonov, TV, PnP) are tuned on held-out
 Fashion-MNIST training images and tested on the Fashion-MNIST test split. The $\sigma_d$ grid is extended to
 $\{0.005,\dots,0.3,0.4,0.5\}$ for all denoisers.
- 
+
 \subsection{Weakly determined subspaces and prior-driven content}\label{sec:subspace}
 Let $A=U\Sigma V^{\top}$ be the SVD of the dense operator, with singular values $s_1\ge\dots\ge s_n$. For a
 threshold $\tau$ let $W_\tau=\mathrm{span}\{v_i : s_i<\tau s_1\}$ and let $P_\tau$ be the orthogonal projector onto
@@ -119,7 +119,7 @@ A lesion is an additive Gaussian blob, $x_{\rm les}=\mathrm{clip}_{[0,1]}\bigl(x
 inserted at a random integer location $p_0$ of the central $16\times16$ region of a test image, with
 $\sigma_l\in\{0.5,0.75,1.25,2.0\}$\,px and contrast $c\in\{0.25,0.5\}$ (eight lesion types). We reconstruct the
 lesion-present image and the lesion-absent original with independent noise realizations ($\sigma=0.05$, 20 angles,
-crime-free data), using the same locations for every method. A lesion is \emph{valid} if its inserted contrast in the
+finer-grid data), using the same locations for every method. A lesion is \emph{valid} if its inserted contrast in the
 ground truth is at least 50\% of nominal (a lesion placed on a saturated stroke is clipped away); invalid cases are
 excluded for all methods, leaving 157--197 of 200 images per type. The observer is a location-known
 statistic, the \emph{local contrast}: the mean of the image in a disc of radius $\rho=\lceil1.5\sigma_l\rceil$ minus its
@@ -131,14 +131,16 @@ mean in the surrounding annulus of width 3 px. We report
       which is $1$ if the lesion contrast is preserved and below 1 if it is attenuated;
 \item the number of \emph{false lesions} per lesion-absent image: local maxima of the contrast map of the
       reconstruction whose response is at least $\theta$, half the response of the nominal lesion, and for which the
-      ground truth has no contrast above $\theta/2$ within 2\,px;
+      ground truth has no contrast above $\theta/2$ within 2\,px (Section~\ref{sec:observer3} generalises $\theta$ to a
+      multiple of the nominal response for the CT study); counts are compared across methods within a lesion type, not across types;
 \item the lesion's \emph{observability}, the fraction of its energy outside $W_{0.05}$.
 \end{itemize}
 For the operating-point study (Section~\ref{sec:oppoint-results}) we sweep 45 PnP settings ($\sigma_d\in\{0.02,0.05,0.1,0.15,0.2\}$,
-$K\in\{1,2,3,5,10,25,50,100,200\}$) and 9 values of the TV weight, choose operating points on 200 held-out
+$k\in\{1,2,3,5,10,25,50,100,200\}$) and 9 values of the TV weight, choose operating points on 200 held-out
 \emph{in-distribution} validation images (disjoint from the images used for PSNR tuning) and report them on the
 test sets, so that the choice is neither made on the evaluation images nor informed by the shifted distribution.
- 
+
+
 \subsection{Matrix-free operator}\label{sec:mf}
 Up to this point the forward operator $A$ was stored as a dense $800\times784$ matrix, which allows exact adjoints,
 closed-form Tikhonov inverses and a full singular value decomposition, but does not scale to clinical image sizes. We
@@ -146,10 +148,10 @@ therefore implemented a matrix-free operator that is never assembled. The forwar
 $40\times40$ canvas (the diagonal of the image, as in the dense operator), rotates it by each angle with bilinear
 interpolation about the pixel used by the reference implementation, and sums along the detector rows. The adjoint is the
 exact transpose of this discretisation, obtained by reverse-mode differentiation, so $\langle Ax,y\rangle=\langle x,A^{\top}y\rangle$
-holds to floating-point precision by construction rather than approximately. The classical baselines use only forward
+holds to floating-point precision by construction. The classical baselines use only forward
 and adjoint applications: Tikhonov by conjugate gradients on $A^{\top}A+\lambda I$, and TV by the same ADMM as before with the $x$-update solved by
 conjugate gradients. The singular subspaces used in Section~\ref{sec:subspace} are obtained with a randomized SVD
-\cite{halko2011} (power iterations and oversampling, forward and adjoint products only); the error split in
+\citep{halko2011} (power iterations and oversampling, forward and adjoint products only); the error split in
 Section~\ref{sec:nullspace-results} then uses the well-determined subspace $\{i: s_i/s_1\ge0.05\}$ and its complement.
 The matrix-free operator was validated against the dense one on the digit images only (E11); the CT study of Stage~3 uses a different matrix-free parallel-beam operator (Section~\ref{sec:lodopab}).
 
@@ -161,16 +163,18 @@ The noise in $\hat p$ is signal dependent, with variance approximately $e^{\mu p
 rays that pass through more material. We use $I_0\in\{1000,300,100,30,10\}$, which gives an effective noise
 standard deviation of $0.018,0.032,0.056,0.106,0.198$ on the sinogram and therefore spans the Gaussian range
 $\sigma\in[0.02,0.2]$ of the earlier experiments. The data are generated from the finer-grid object
-(Section~\ref{sec:crimefree}, bicubic, factor 5), so the inverse crime remains removed. The reconstruction methods are
+(Section~\ref{sec:crimefree}, bicubic, factor 5), so the inverse crime is reduced as before. The reconstruction methods are
 unchanged and treat $\hat p$ with an unweighted least-squares data term (a Gaussian approximation); for PnP we also
 tested a variant with weights $w=N/I_0$ (an inverse-variance weighting up to a constant). All hyperparameters are tuned at each dose on 100 held-out MNIST validation images
 and frozen for every test set.
- 
+
 \subsection{LoDoPaB-CT setting}\label{sec:lodopab}
-LoDoPaB-CT~\cite{leuschner2021} provides $362\times362$ slices with values $\mu/\mu_{\max}\in[0,1]$ and simulated low-dose observations of 1000 parallel-beam angles on 513 detector bins.
+LoDoPaB-CT~\citep{leuschner2021} provides $362\times362$ slices with values $\mu/\mu_{\max}\in[0,1]$ and simulated low-dose observations of 1000 parallel-beam angles on 513 detector bins. The ground-truth slices derive from the LIDC-IDRI database~\citep{armato2011lidc,armato2015lidcdata},
+distributed through The Cancer Imaging Archive~\citep{clark2013tcia}.
 The official split has 35\,820 training slices from 632 patients, 3\,522 validation slices from 60 patients and 3\,553 test slices from 60 patients; we verified that the three sets of patient identifiers
 are disjoint. We use 8\,960 training slices (from the 632 training patients) to train the prior, 20 validation slices, one from each of 20 patients, for all tuning, and 40 test slices, one from each of 40
-patients (the same 40 in every experiment), for all evaluation; the patient is therefore the unit of statistical analysis. The projector is a matrix-free parallel-beam operator with a unit-tested adjoint;
+patients (the same 40 in every experiment), for all evaluation; the patient is therefore the unit of statistical analysis.
+The projector is a matrix-free parallel-beam operator with a unit-tested adjoint;
 its conventions (rotation sign, detector flip, image transposition, angle offset) were fixed by projecting the ground truth and comparing with the supplied observations over 16 variants: the selected one has a relative residual of $0.038$ (correlation $0.9979$), the best alternative $0.166$,
 and the fitted pixel size is $1.0044$ times the nominal $0.26\,\mathrm{m}/362$. Sparse-view data use $K\in\{30,60,120\}$ evenly spaced angles out of the 1000.
 
@@ -178,35 +182,41 @@ and the fitted pixel size is $1.0044$ times the nominal $0.26\,\mathrm{m}/362$. 
 The observations follow $y=-\ln(N/N_0)/\mu_{\max}$ with $N\sim\mathrm{Poisson}(N_0e^{-\mu_{\max}Ax})$, $N_0=4096$ photons per detector bin, $\mu_{\max}=81.35858\,\mathrm{m^{-1}}$, and zero counts replaced by $0.1$.
 We checked this model on the data: the counts recovered from the observations are integers in $100\%$ of the bins for $N_0=4096$ (and 8192), against $9.7$--$10.4\%$ for perturbed values of $\mu_{\max}$ (chance level $10\%$) and $24.7\%$ and $49.9\%$ for $N_0=1024$ and 2048.
 The dispersion index $\overline{(N-\lambda)^2/\lambda}$ around the counts expected from the ground truth is $1.06$, $1.25$ and $1.81$ for expected counts in $[20,200)$, $[200,1000)$ and $[1000,5000)$; values above one include discretisation and ground-truth error, so the real data may contain somewhat more variance than the simulation.
-Lower doses $f\in\{1,0.25,0.1\}$ (4096, 1024 and about 410 photons per detector bin) are obtained from the real observations by exact binomial thinning of the recovered counts (a thinned Poisson variable is Poisson with $f$ times the mean), which is used for \emph{tuning}.
+Lower doses $\phi\in\{1,0.25,0.1\}$ (4096, 1024 and about 410 photons per detector bin) are obtained from the real observations by exact binomial thinning of the recovered counts (a thinned Poisson variable is Poisson with $\phi$ times the mean); these real thinned observations are used for \emph{tuning}.
 For \emph{evaluation} the data are simulated without the inverse crime: the slice is up-sampled by a factor two (bicubic), projected on the $724\times724$ grid with half-size pixels and 1026 detector bins, pairs of bins are averaged, and Poisson noise is added exactly as above.
-Section~\ref{sec:e14} compares reconstructions from simulated and from real data of the same slices.
- 
+Hyperparameters are therefore tuned on real thinned data and applied to simulated data. Section~\ref{sec:e14} checks the simulator against real data for the TV baseline only.
+
 \subsection{Methods and tuning in the CT study}\label{sec:methods3}
-\emph{FBP-Hann}: filtered back-projection with the ramp filter multiplied by a Hann window whose cut-off (a fraction of Nyquist) is tuned; it is a linear regularised reconstruction. \emph{TV}: isotropic total variation with the box constraint $[0,1]$ (forward differences, Neumann boundary), solved by the primal--dual algorithm of Chambolle and Pock~\cite{chambolle2011} for 150 iterations
+\emph{FBP-Hann}: filtered back-projection with the ramp filter multiplied by a Hann window whose cut-off (a fraction of Nyquist) is tuned; it is a linear regularised reconstruction. \emph{TV}: isotropic total variation with the box constraint $[0,1]$ (forward differences, Neumann boundary), solved by the primal--dual algorithm of Chambolle and Pock~\citep{chambolle2011} for 150 iterations
 from the FBP-Hann image. The problem is normalised by $\lVert A\rVert^2$, i.e.\ $\tfrac{1}{2\lVert A\rVert^2}\lVert Ax-y\rVert_2^2+\lambda\,\mathrm{TV}(x)$, so TV weights are in these normalised units and are not comparable with those of Stage~1.
-\emph{TV-long} is the same with 300 iterations and its own tuned weight, a control for the extra iterations that PnP performs. \emph{PnP-const}: Algorithm~\ref{alg:pnp} with $\eta=1/L$ ($L$ by power iteration), started from the FBP-Hann image, with
-$(\sigma_d,k)$ tuned; \emph{PnP-TVinit}: the same started from the TV solution. $D_\sigma$ is the noise-level-conditioned DnCNN of Section~\ref{sec:pnp} (8 layers, 64 channels, $\sigma$ as a second input channel, residual output), here trained on the 8\,960 LoDoPaB slices for 15\,000 steps (batch 16, random $128\times128$ crops and flips, $\sigma\sim U(0,0.1)$, Adam, cosine schedule).
+\emph{TV-long} is the same with 300 iterations and a tuned weight; it was added to test whether TV's lower iteration count explains the comparison with PnP (Section~\ref{sec:history3}).
+\emph{PnP-const}: Algorithm~\ref{alg:pnp} with $\eta=1/L$ ($L$ by power iteration), started from the FBP-Hann image, with
+$(\sigma_d,k)$ tuned; \emph{PnP-TVinit}: the same started from the TV solution. In the dose $\times$ angle study the tuned $k$ is at most 12 (Table~\ref{tab:params3}), so PnP-TVinit performs at most 162 iterations in total and PnP-const at most 12.
+An iteration of each method has a different cost, and computation time was not matched.
+$D_\sigma$ is the noise-level-conditioned DnCNN of Section~\ref{sec:pnp} (8 layers, 64 channels, $\sigma$ as a second input channel, residual output), here trained on the 8\,960 LoDoPaB slices for 15\,000 steps (batch 16, random $128\times128$ crops and flips, $\sigma\sim U(0,0.1)$, Adam, cosine schedule).
 A 17-layer variant (20\,000 steps) was also trained and evaluated at $K=60$.
 Every method and condition is tuned separately on the 20 validation slices (real observations, thinned and angle-subsampled) by maximising the mean PSNR (peak 1, reconstructions clipped to $[0,1]$).
-The initial grids of the dose $\times$ angle study are cut-off $\{0.08,0.12,0.16,0.2,0.3,0.4\}$, TV weight $\{10^{-3},3\cdot10^{-3},10^{-2},3\cdot10^{-2}\}$, $\sigma_d\in\{0.01,0.02,0.03,0.05,0.08\}$ and $k\in\{1,2,4,8,12,20,30,45\}$ (the $K=60$ steps used similar grids, see the scripts); whenever the optimum falls on the boundary of a grid, the grid is extended (up to twice; cut-off $\times0.75$ or $+0.1$, TV weight $\times3$ or $\div3$,
-$\sigma_d$ $\times1.6$ or $\div1.6$). The final choices are listed in Table~\ref{tab:params3}.
+The initial grids of the dose $\times$ angle study are cut-off $\{0.08,0.12,0.16,0.2,0.3,0.4\}$, TV weight $\{10^{-3},3\cdot10^{-3},10^{-2},3\cdot10^{-2}\}$, $\sigma_d\in\{0.01,0.02,0.03,0.05,0.08\}$ and $k\in\{1,2,4,8,12,20,30,45\}$ (the $K=60$ study used similar grids, listed in the code repository); whenever the optimum falls on the boundary of a grid, the grid is extended (up to twice; cut-off $\times0.75$ or $+0.1$, TV weight $\times3$ or $\div3$,
+$\sigma_d$ $\times1.6$ or $\div1.6$). The final choices are listed in Table~\ref{tab:params3}. Two PnP-TVinit optima remain on a grid boundary after the extensions, and one tuned $\sigma_d$ ($0.128$) exceeds the training range of the denoiser $(0,0.1)$; results from these cells are flagged where they are used.
 
 \subsection{Lesion observer}\label{sec:observer3}
 The protocol of Section~\ref{sec:lesion} is applied to $362\times362$ slices. Lesions are additive Gaussian blobs, clipped to $[0,1]$, with $\sigma_l\in\{2,4\}$\,px ($1.4$ and $2.9$\,mm at $0.72$\,mm per pixel) and contrast $c=0.06$ on the $\mu/\mu_{\max}$ scale
 (in the step at $K=60$ also $c=0.03$). If water is taken to be about $0.25$ on this scale, which is an assumption, $c=0.06$ and $0.03$ correspond to roughly $240$ and $120$\,HU; the lesions are small and noisy at low dose but are not low-contrast in the clinical sense.
 Four lesions of one type are inserted into each slice at random positions at least $10\sigma_{l,\max}+4=44$\,px apart, inside the body eroded by 22\,px (CT slices) or in the central square (phantoms); the lesion-free and lesion-present images are reconstructed from independent noise realisations.
 A lesion is valid if its inserted response is at least half the nominal one. The observer is the location-known, zero-sum local-contrast statistic of Section~\ref{sec:lesion} (disc of radius $\lceil1.5\sigma_l\rceil$ minus a 3-px annulus), and the detection score is the paired AUC pooled over valid lesions (up to $40\times4=160$ lesions per lesion type on CT slices, $20\times4=80$ on phantoms).
-A \emph{false blob} is a local maximum (in a $5\times5$ window) of the response map of a lesion-\emph{free} reconstruction whose response is at least $m\,r_{\rm nom}$ ($r_{\rm nom}$: response to the nominal lesion on an empty background; $m\in\{0.5,0.75,1,1.5\}$) and for which the truth has no response above half of $0.5\,r_{\rm nom}$ within 2\,px.
-$m=1$ and $1.5$ count structures that a reader of this statistic would take for at least a full lesion. The statistic measures lesion-like response at the scale of the kernel; we did not run a reader study, so ``convincing'' is shorthand for this response.
- 
+A \emph{false blob} is a local maximum (in a $5\times5$ window) of the response map of a lesion-\emph{free} reconstruction whose response is at least $\gamma\,r_{\rm nom}$ ($r_{\rm nom}$: response to the nominal lesion on an empty background; $\gamma\in\{0.5,0.75,1,1.5\}$) and for which the truth has no response above $0.25\,r_{\rm nom}$ within 2\,px.
+$\gamma=1$ and $1.5$ count structures that a reader of this statistic would take for at least a full lesion. The statistic measures lesion-like response at the scale of the kernel; we did not run a reader study, so ``false blob'' refers only to this response. Because the LoDoPaB ground truth is itself a reconstruction, ``false'' means unsupported by this reference, not absent from the patient.
+
 \subsection{Statistics (Stage 3)}\label{sec:stats3}
 All comparisons are paired: two methods are evaluated on the same patients and the same simulated data, and the difference is summarised by its mean over patients with a $95\%$ percentile bootstrap interval over patients (2\,000 resamples in the $K=60$ lesion experiments, 5\,000 elsewhere), with the same resamples for both methods.
-Lesion types are pooled with equal weight; per-type rows are exploratory. For the shift comparison, the CT and phantom differences are bootstrapped independently (different images) and their difference is the \emph{shift effect}. No correction for multiplicity is applied, so we report the numbers of cells with significant positive and negative differences
-and read the sign pattern across conditions rather than any single interval. Each condition uses one noise realisation, which limits the precision of a single cell (for AUC about $\pm0.05$); the 20 phantoms are the same in all conditions, so conditions are not independent.
+Lesion types are pooled with equal weight; per-type rows are exploratory. For the shift comparison, the CT and phantom differences are bootstrapped independently (different images) and their difference is the \emph{shift effect}.
+No analysis was designated primary in advance (Section~\ref{sec:history3}), and no correction for multiplicity is applied, so all intervals are descriptive: we report the numbers of cells with significant positive and negative differences
+and read the sign pattern across conditions rather than any single interval. Each condition uses one noise realisation, which limits the precision of a single cell (for AUC about $\pm0.05$); the same 40 patients, and the same 20 phantoms, are used in all conditions, so conditions are not independent.
 
 \subsection{Analysis history}\label{sec:history3}
-The analysis was developed in steps, and some of them changed the conclusions. We list them because they affect how the final numbers should be read. (i)~A first comparison at $K=60$ (tuning on 6 validation slices, Hann cut-off $0.2$) found PnP $0.85$ and $0.33$\,dB below TV at full and quarter dose.
+The analysis was developed in steps after seeing results, and some steps changed the conclusions; none of the choices below was pre-specified.
+(i)~A first comparison at $K=60$ (tuning on 6 validation slices, Hann cut-off $0.2$) found PnP $0.85$ and $0.33$\,dB below TV at full and quarter dose.
 Re-tuning on 20 slices (cut-off $0.3$ at full dose) raised PnP-const by $1.06$\,dB ($30.68\to31.74$) and $0.32$\,dB ($29.40\to29.72$) but TV by only $0.38$ and $0.09$\,dB, and the gap became $-0.17$ and $-0.10$\,dB (Table~\ref{tab:e15}); the initial gap was an artefact of the starting image and the small tuning set, and we do not use it.
 (ii)~The lesion experiments were first tuned on 10 slices with narrow grids; they were repeated with 20 slices, extended grids and a separately tuned TV-long. At full dose the parameters of FBP, TV, TV-long and PnP-const did not change (the PSNR of PnP-TVinit changed by $0.07$\,dB) and no pooled verdict changed; at quarter dose one of 20 pooled verdicts changed (PnP-TVinit $-$ TV-long AUC, from significant to not significant).
-(iii)~Paired statistics, the threshold sweep and the false-blob definition at several strengths were added after seeing the first lesion results, and the dose $\times$ angle grid and the shift extension to $K=30,120$ were run afterwards; none of this was pre-specified.
+(iii)~The PnP variants of Section~\ref{sec:e15} (PnP-TVinit, annealing, TV+denoise, the 17-layer denoiser) were introduced after PnP-const first fell below TV.
+(iv)~Paired statistics, the threshold sweep and the false-blob definition at several strengths were added after seeing the first lesion results, and the dose $\times$ angle grid and the shift extension to $K=30,120$ were run afterwards.

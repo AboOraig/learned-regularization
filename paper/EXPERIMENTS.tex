@@ -4,11 +4,11 @@
 % =======================================================
 \subsection{E1--E2: In-distribution accuracy under noise and undersampling}\label{sec:e1e2}
 \paragraph{Setting.}
-Test images are 200 MNIST digits and all hyper-parameters are tuned on 100 separate validation images (Section~\ref{sec:settings}). The
-noise sweep fixes 20 projection angles and varies the measurement noise $\sigma\in\{0,0.01,0.05,0.1,0.2\}$; the angle sweep fixes
+Test images are 200 MNIST digits; all hyper-parameters are tuned on 100 separate validation images (Section~\ref{sec:protocol12}). The
+noise sweep fixes 20 projection angles and varies $\sigma\in\{0,0.01,0.05,0.1,0.2\}$; the angle sweep fixes
 $\sigma=0.05$ and uses $5,10,20,40,90$ angles. Each cell is one noise realisation. Tables~\ref{tab:e1e2} and~\ref{tab:e1e2gap} first use data generated with the reconstruction
-operator itself (``inverse crime''), because this is the setting of the original study; Table~\ref{tab:e1e2gap} then repeats the PnP--TV
-comparison with data simulated on a finer grid (bicubic, factor~5; the default crime-free setting, Section~\ref{sec:crime-results}).
+operator itself (``inverse crime''), the setting of the original study; Table~\ref{tab:e1e2gap} then repeats the PnP--TV
+comparison with data simulated on a finer grid (bicubic, factor~5; the default finer-grid setting, Section~\ref{sec:crime-results}).
 Two total-variation baselines are reported: \emph{TV-ADMM} is the unconstrained ADMM solver used throughout Stages~1--2, and
 \emph{TV-box} is the same functional solved with the constraint $0\le x\le1$ by Chambolle--Pock (1000 iterations, $\lambda$ re-tuned on the validation images).
 TV-box is the fairer comparison, because the PnP iterates are clipped to $[0,1]$ at every iteration; it is a control added after the main experiments (E2b), and the other
@@ -40,10 +40,10 @@ $\sigma{=}0.2$, 20 angles   & 6.6  & 12.9 & 14.3 & 14.6 & \textbf{15.3} \\
 \begin{table}[htbp]
 \centering\small\setlength{\tabcolsep}{4pt}
 \caption{PnP$-$TV PSNR gap (dB) with 95\% bootstrap intervals over the 200 test images; positive means PnP is better. Left: data generated with the reconstruction operator (the PSNR values of Table~\ref{tab:e1e2}).
-Right: data simulated on a finer grid, which removes the inverse crime. Hyper-parameters are re-tuned for each data model. $\dagger$: see Table~\ref{tab:e1e2}.}\label{tab:e1e2gap}
+Right: data simulated on a finer grid, which reduces the inverse crime. Hyper-parameters are re-tuned for each data model. $\dagger$: see Table~\ref{tab:e1e2}.}\label{tab:e1e2gap}
 \begin{tabular}{lcccc}
 \toprule
- & \multicolumn{2}{c}{Inverse crime} & \multicolumn{2}{c}{Crime-free (bicubic)}\\
+ & \multicolumn{2}{c}{Inverse crime} & \multicolumn{2}{c}{Finer grid (bicubic)}\\
 \cmidrule(lr){2-3}\cmidrule(lr){4-5}
 Condition & vs TV-ADMM & vs TV-box & vs TV-ADMM & vs TV-box \\
 \midrule
@@ -71,21 +71,21 @@ $\sigma{=}0.2$, 20 angles  & $+1.03$ [$+0.78,+1.29$] & $+0.65$ [$+0.40,+0.89$] &
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=0.95\textwidth]{figures/comparison_angles.png}
-\caption{Reconstruction accuracy (PSNR, left; SSIM, right) against the number of projection angles at $\sigma=0.05$ (logarithmic axis), inverse-crime data, TV-ADMM as the TV baseline. PnP-DnCNN is best at every angle count tested. Error bars as in Figure~\ref{fig:comparison_noise}.}
+\caption{As Figure~\ref{fig:comparison_noise}, against the number of projection angles at $\sigma=0.05$ (logarithmic axis). PnP-DnCNN is best at every angle count tested.}
 \label{fig:comparison_angles}
 \end{figure}
 
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=0.95\textwidth]{figures/fig_e1e2_gap.png}
-\caption{PnP$-$TV PSNR gap on crime-free (bicubic) data against the unconstrained TV-ADMM and the box-constrained TV-box. Bars are 95\% bootstrap intervals over 200 images. The box constraint lowers the PnP advantage by $0.4$--$1.0$\,dB at $\sigma\ge0.05$ and, in the angle sweep, most at 5 angles; it does not change the sign anywhere except at $\sigma=0.01$ on inverse-crime data (Table~\ref{tab:e1e2gap}).}
+\caption{PnP$-$TV PSNR gap on finer-grid (bicubic) data against the unconstrained TV-ADMM and the box-constrained TV-box. Bars are 95\% bootstrap intervals over 200 images. The box constraint lowers the PnP advantage by $0.4$--$1.0$\,dB at $\sigma\ge0.05$ and, in the angle sweep, most at 5 angles; on these data it changes no sign (on inverse-crime data it does at $\sigma=0.01$, Table~\ref{tab:e1e2gap}).}
 \label{fig:e1e2gap}
 \end{figure}
 
 \paragraph{Results.}
 \emph{(i) Where the learned prior wins.} For $\sigma\ge0.05$ PnP-DnCNN has the highest PSNR at every angle count and noise level tested, and the gap
 over TV is significantly positive against both TV variants and on both data models (Table~\ref{tab:e1e2gap}). The gap is largest at $\sigma=0.05$ with 20--40 angles:
-$+3.8$ to $+3.9$\,dB against TV-ADMM, but $+3.3$\,dB against TV-box on inverse-crime data and $+3.4$ to $+3.5$\,dB on crime-free data. We take the box-constrained, crime-free value as the headline
+$+3.8$ to $+3.9$\,dB against TV-ADMM, but $+3.3$\,dB against TV-box on inverse-crime data and $+3.4$ to $+3.5$\,dB on finer-grid data. We take the box-constrained, finer-grid value as the headline
 ($\approx3.5$\,dB for this denoiser; $3.4$\,dB averaged over three independently trained denoisers in E8). Against TV-ADMM, PnP has the higher PSNR in 100\% of the 200 images at $\sigma=0.05$ with 20, 40 and 90 angles, in 96\% at $\sigma=0.1$, but only
 in 68\% at $\sigma=0.2$ and 87\% at 5 angles, where the average gap is small ($+1.0$ and $+2.1$\,dB). Against TV-box the gap shrinks fastest in the hardest regimes: from $+2.1$ to $+1.1$\,dB at 5 angles and
 from $+1.03$ to $+0.65$\,dB at $\sigma=0.2$ (inverse-crime data).
@@ -93,8 +93,8 @@ from $+1.03$ to $+0.65$\,dB at $\sigma=0.2$ (inverse-crime data).
 \emph{(ii) SSIM.} The SSIM gain is larger than the PSNR gain suggests (TV-ADMM $0.74\to$ PnP $0.94$ at $\sigma=0.05$ with 20 angles; $0.50\to0.79$ at 5 angles; $0.41\to0.68$ at $\sigma=0.2$) and PnP has the higher SSIM, significantly so (paired Wilcoxon), in every condition except $\sigma=0$, where TV is significantly higher ($0.996$ vs.\ $0.982$). We did not compute SSIM for TV-box. SSIM is later shown to be lower for PnP on real CT (Stage~3); we attribute the high SSIM here to the match between
 the denoiser's training distribution and the test digits, but did not test this.
 
-\emph{(iii) The noise-free and low-noise end depends on the data model and the TV solver.} At $\sigma=0$ the learned prior is below TV in every variant ($-6.4$\,dB on inverse-crime data, $-3.3$\,dB crime-free against TV-ADMM; larger still against TV-box).
-At $\sigma=0.01$ the sign of the PnP--TV gap changes with these choices: not distinguishable from zero against TV-ADMM on inverse-crime data ($+0.07$\,dB), $-0.75$\,dB against TV-box on the same data, and $+0.35$\,dB against TV-box on crime-free data.
+\emph{(iii) The noise-free and low-noise end depends on the data model and the TV solver.} At $\sigma=0$ the learned prior is below TV in every variant ($-6.4$\,dB on inverse-crime data, $-3.3$\,dB finer-grid against TV-ADMM; larger still against TV-box).
+At $\sigma=0.01$ the sign of the PnP--TV gap changes with these choices: not distinguishable from zero against TV-ADMM on inverse-crime data ($+0.07$\,dB), $-0.75$\,dB against TV-box on the same data, and $+0.35$\,dB against TV-box on finer-grid data.
 No claim about PnP versus TV at $\sigma\le0.01$ should therefore be made from E1--E2 alone; Section~\ref{sec:crime-results} analyses the data-model dependence.
 
 \emph{(iv) Classical baselines.} TV (either variant) is the best classical method in every condition, and Tikhonov is above FBP except at 90 angles (Table~\ref{tab:e1e2}). A possible reason for TV's advantage is that digit images are close to piecewise constant; we did not test this.
@@ -102,7 +102,7 @@ No claim about PnP versus TV at $\sigma\le0.01$ should therefore be made from E1
 \paragraph{Caveats.}
 (a)~Each cell uses one noise realisation, a single denoiser and one tuning run; the intervals in Table~\ref{tab:e1e2gap} describe the variability across test images only. The only measure of
 training variability is E8 (three denoisers), where the in-distribution gap varies by $0.03$\,dB between seeds, small compared with the gaps above.
-(b)~PnP has two tuned parameters (denoiser level $\sigma_d$ and iteration count $k$, $5\le k\le100$ across conditions) against one for TV, and early stopping is itself a regulariser. The TV baselines are run to convergence (1000 iterations for TV-box; 100 for TV-ADMM), so the comparison is between a tuned few-iteration PnP and a converged TV; the inclusion of TV-box addresses the box constraint but not the difference in tuning degrees of freedom.
+(b)~PnP has two tuned parameters (denoiser level $\sigma_d$ and iteration count $k$, $5\le k\le100$ across conditions; 88 grid points) against one for TV (17 grid points), and early stopping is itself a regulariser. The TV iteration count is fixed and not tuned (100 for TV-ADMM, 1000 for TV-box), so the comparison is between a tuned few-iteration PnP and a TV with a fixed, larger iteration count; TV-box addresses the box constraint but not the difference in tuning degrees of freedom.
 (c)~All numbers are for $28\times28$ digits whose training distribution matches the test distribution by construction; what happens when it does not is the subject of E4 and E8.
 
 \begin{figure}[htbp]
@@ -157,7 +157,7 @@ Data generated at the angles $\theta_j$ are consistent with an operator at the a
 the best a method can do, yet a pixel-wise metric against the true image penalises it. To separate the two effects we scored each reconstruction against the true digit and against the true digit rotated by $\delta$ (Table~\ref{tab:e3rot};
 the opposite direction gives lower agreement). Against the rotated digit PnP keeps its nominal accuracy (24.1--24.2\,dB at all offsets, against 24.0\,dB at $\delta=0$), so the 4.0\,dB loss in Table~\ref{tab:e3} is
 registration error, not a loss of reconstruction quality; TV also loses nothing against the rotated digit (it scores 20.4--21.0\,dB against 20.15\,dB nominal; part of this is because the interpolated reference is smoother than the true digit).
-The sharper reconstruction has more to lose under a pixel-wise metric: even a perfect reconstruction rotated by $4^\circ$ would score only 22.1\,dB, and PnP's 20.05\,dB is already close to this ceiling.
+The sharper reconstruction has more to lose under a pixel-wise metric: even a perfect reconstruction rotated by $4^\circ$ would score only 22.1\,dB, and PnP's 20.05\,dB is within about 2\,dB of this ceiling.
 
 \begin{table}[htbp]
 \centering\small\setlength{\tabcolsep}{6pt}
@@ -191,8 +191,7 @@ was not run for E3.
 
 \subsection{E4: Distribution shift}\label{sec:e4}
 \paragraph{Setting.}
-The denoiser is trained on MNIST digits only. The complete pipeline, with hyper-parameters tuned once on the MNIST validation images at $\sigma=0.05$ and 20 angles (TV-ADMM $\lambda=5.6\times10^{-3}$; PnP $\sigma_d=0.1$, $k=5$) and then frozen, is
-applied to 200 Fashion-MNIST test images, 200 EMNIST letters, and a $28\times28$ Shepp--Logan phantom. The phantom is a single image, so its 20 test cases are 20 independent noise draws and its
+The denoiser is trained on MNIST digits only. The complete pipeline, with hyper-parameters tuned once on the MNIST validation images at $\sigma=0.05$ and 20 angles (TV-ADMM $\lambda=5.6\times10^{-3}$; PnP $\sigma_d=0.1$, $k=5$) and then frozen, is applied to 200 Fashion-MNIST~\citep{xiao2017fashion} test images, 200 EMNIST~\citep{cohen2017emnist} letters, and a $28\times28$ Shepp--Logan phantom~\citep{shepp1974}. The phantom is a single image, so its 20 test cases are 20 independent noise draws and its
 interval describes noise variability only. Data are generated with the reconstruction operator (inverse crime) with a different noise realisation from E1, so the MNIST row differs slightly from Table~\ref{tab:e1e2}. The labels ``near'' and ``far''
 shift are our a priori judgement; no distance between the distributions was computed.
 
@@ -226,7 +225,7 @@ above on the phantom. Error bars: mean $\pm1.96$ standard errors; for the phanto
 
 \begin{table}[htbp]
 \centering\small\setlength{\tabcolsep}{4pt}
-\caption{Control with a box-constrained TV (TV-box, $0\le x\le1$, 1000 iterations, $\lambda$ tuned on the MNIST validation images). Three independently trained MNIST denoisers (E8), bicubic fine-grid data,
+\caption{Control with a box-constrained TV (TV-box, $0\le x\le1$, 1000 iterations, $\lambda$ tuned on the MNIST validation images). Three independently trained MNIST denoisers (E8), bicubic finer-grid data,
 $\sigma=0.05$, 20 angles. Mean test PSNR over the three denoisers and gap $=$ PnP$-$TV, mean $\pm$ s.d.\ over denoisers.}\label{tab:e4box}
 \begin{tabular}{lccccc}
 \toprule
@@ -244,13 +243,13 @@ Shepp--Logan   & 19.28 & 19.50 & 14.96 & $-4.33\pm0.12$ & $-4.55\pm0.12$ \\
 \centering
 \includegraphics[width=0.6\textwidth]{figures/fig_shift_grid.png}
 \caption{Reconstructions at $\sigma=0.05$, 20 angles, with the frozen pipeline: the first test image of each set (no selection), one noise draw, TV-ADMM and the single MNIST-trained PnP denoiser of Table~\ref{tab:e4}.
-On Fashion-MNIST and the phantom the PnP output contains spotted or stroke-like fragments that are absent from the ground truth; the TV output is blurred and blocky but does not introduce such structure. A TV-box column and PSNR values are not shown.}
+On Fashion-MNIST and the phantom the PnP output contains spotted or stroke-like fragments that are absent from the ground truth; in these examples the TV output is blurred and blocky but does not introduce such structure. A TV-box column and PSNR values are not shown.}
 \label{fig:shift}
 \end{figure}
 
 \paragraph{Results.}
 \emph{(i) The advantage does not transfer to far-shifted images.} On EMNIST letters PnP keeps about half of its in-distribution advantage ($+1.9$ against $+3.7$\,dB). On Fashion-MNIST and the phantom it is below TV, in 89\% and 100\% of the test cases respectively (Table~\ref{tab:e4}).
-The reversal is not an artefact of the unconstrained TV: with a box-constrained TV the gaps are $-3.13$ and $-4.55$\,dB, slightly larger than against TV-ADMM, because the box constraint helps TV on the phantom by $0.2$\,dB and on Fashion-MNIST by $0.03$\,dB (Table~\ref{tab:e4box}). The in-distribution advantage, in contrast,
+The reversal is not an artefact of the unconstrained TV: on the data of Table~\ref{tab:e4box}, the gaps are $-3.10$ and $-4.33$\,dB against TV-ADMM and $-3.13$ and $-4.55$\,dB against the box-constrained TV, slightly larger because the box constraint helps TV on the phantom by $0.2$\,dB and on Fashion-MNIST by $0.03$\,dB. The in-distribution advantage, in contrast,
 loses $0.5$\,dB to the box constraint ($+3.84\to+3.36$\,dB).
 \emph{(ii) Variability.} Across three independently trained MNIST denoisers the Fashion-MNIST gap has a standard deviation of $0.30$\,dB and the phantom gap $0.12$\,dB (Table~\ref{tab:e4box}); the single denoiser of Table~\ref{tab:e4} gives similar values ($-3.05$ and $-4.16$\,dB, on a different data model) and the sign never changes.
 \emph{(iii) PSNR and SSIM disagree on Fashion-MNIST.} PnP is $3.1$\,dB below TV in PSNR but equal in SSIM ($0.675$ against $0.680$), while on the phantom both are clearly lower ($0.517$ against $0.722$). We did not examine why; a plausible reading is that the PnP error on Fashion-MNIST is
@@ -261,11 +260,10 @@ The converse experiment, in which a prior trained on Fashion-MNIST is tested on 
 
 \paragraph{Caveats.}
 (a)~The pipeline is frozen at MNIST-tuned values. The deficit therefore combines a mismatched prior with mismatched hyper-parameters, and we did not test whether re-tuning $\sigma_d$ and $k$ on the target set would reduce it; the matched-prior control of E8 changes the prior and the tuning set together.
-(b)~The phantom is one image, so the ``far shift'' evidence on it is one object; Fashion-MNIST supplies the only far-shift evidence over many images. (c)~Table~\ref{tab:e4} uses inverse-crime data and Table~\ref{tab:e4box} crime-free data; the conclusions agree, but the numbers are not interchangeable.
-(d)~Only three datasets are used, so no claim about how the deficit scales with the distance between distributions can be made.
+(b)~The phantom is one image, so the ``far shift'' evidence on it is one object; Fashion-MNIST supplies the only far-shift evidence over many images. (c)~Table~\ref{tab:e4} uses inverse-crime data and Table~\ref{tab:e4box} finer-grid data; the conclusions agree, but the numbers are not interchangeable.
+(d)~Only three datasets are used, so no claim about how the deficit scales with the distance between distributions can be made. MNIST digits are close to binary, whereas Fashion-MNIST images and the phantom contain intermediate grey levels, so the shifts confound structural and intensity statistics; we did not separate the two.
 
-
-\subsection{E5: Why PnP selects few iterations}\label{sec:e5}
+\subsection{E5: Behaviour of PnP beyond the selected iteration count}\label{sec:e5}
 \paragraph{Setting.}
 Validation tuning selects few iterations: $k=5$ at $\sigma\le0.05$ with 20 or 90 angles, $10$ at $\sigma=0.1$ or 40 angles, $25$ at $\sigma=0.2$ or 10 angles, and $100$ at 5 angles (E1--E2). To see what happens beyond the selected $k$ we
 ran the tuned pipeline ($\sigma=0.05$, 20 angles, inverse-crime data, 200 test digits) with $\sigma_d\in\{0.02,0.05,0.1,0.2\}$ and recorded the iterate at $k\in\{1,2,5,10,25,50,100,200,400\}$ (so the location of a peak is resolved only to this grid).
@@ -282,15 +280,14 @@ Middle: data residual relative to the expected noise norm $\sigma\sqrt{m}$. Righ
 
 \paragraph{Results.}
 \emph{(i) Early stopping is necessary at every $\sigma_d$ tested.} For $\sigma_d=0.1$ the PSNR peaks at $k=5$ ($23.97$\,dB) and falls to $22.09$\,dB at $k=400$ (Figure~\ref{fig:convergence}, left). The decay is stronger for larger $\sigma_d$ ($\sigma_d=0.2$: $23.28$\,dB at $k=2$ to $19.64$\,dB at $k=400$, below TV's $20.27$\,dB) and weaker for smaller ones. Among the four $\sigma_d$ the best converged
-setting is $\sigma_d=0.05$ at $22.78$\,dB: $1.2$\,dB below the early-stopped optimum, but still $2.5$\,dB above TV. Early stopping is therefore worth about 1\,dB here and is not what makes PnP better than TV in distribution.
+setting (chosen on the test images) is $\sigma_d=0.05$ at $22.78$\,dB: $1.2$\,dB below the early-stopped optimum, but still $2.5$\,dB above TV. Early stopping is therefore worth about 1\,dB here and is not what makes PnP better than TV in distribution.
 
 \emph{(ii) The data residual stays at the noise level.} For $\sigma_d=0.1$ the ratio $\lVert Ax_k-y\rVert/(\sigma\sqrt m)$ moves from $0.994$ at the selected iterate to $1.019$ at $k=400$ (at most $1.08$ for $\sigma_d=0.2$) (Figure~\ref{fig:convergence}, middle). The iterates are
-data-consistent to within a few percent of the noise level at every $k$, and the residual changes by 2.5\% between the best and the converged iterate; a discrepancy-principle stopping rule could not pick $k=5$ from it. The earlier reading that the denoiser's prior increasingly dominates the data term
-is not supported by these data: the iteration converges, and it converges to a point that fits the data as well as the early iterates do but has a larger error.
+data-consistent to within a few percent of the noise level at every $k$, and the residual changes by 2.5\% between the best and the converged iterate, so a discrepancy-principle stopping rule could not pick $k=5$ from it. The prior therefore does not increasingly override the data term: the iteration converges to a point that fits the data as well as the early iterates do but has a larger error.
 
 \emph{(iii) Where the error grows.} Between $k=5$ and $k=400$ ($\sigma_d=0.1$) the squared error rises from $3.36$ to $5.52$. Of this increase of $2.16$, $74\%$ lies in the directions with $0.1\le s_i/s_1<0.3$ (382 of 784 directions), $17\%$ in the directions below $0.1$ (including the exact null space), $10\%$ in $0.3\le s_i/s_1<0.5$, and none in the directions with $s_i/s_1\ge0.5$, where the error does not
-grow (Figure~\ref{fig:convergence}, right). The gradient step contracts the error in direction $i$ by $(1-(s_i/s_1)^2)^k$ (Section~\ref{sec:nullspace-results}), i.e.\ by $0.82$ for $s_i/s_1=0.2$ after 5 iterations, $0.36$ after 25 and $0.02$ after 100. These directions therefore become determined by the data
-at about the iterations where the PSNR declines (10 to 100), which is what classical semi-convergence of iterative regularisation predicts: further iterations fit the noise in poorly determined directions. This is consistent with the data, not a test of the mechanism. In particular, the tuned $k$ is also $5$ at $\sigma=0$ (E1), so noise fitting cannot be the only cause; we did not record the iteration curve on noise-free data.
+grow (percentages rounded; Figure~\ref{fig:convergence}, right, shows the bands $<0.05$, $0.05$--$0.1$, $0.1$--$0.2$, $0.2$--$0.3$ and $\ge0.3$, so the split of the last band is from the stored data). Without the denoiser, the gradient step with $\eta=1/L$ would contract the distance between the iterate and the data-fitting (least-squares) solution in direction $i$ by $(1-(s_i/s_1)^2)^k$ (Section~\ref{sec:nullspace-results}),
+i.e.\ by $0.82$ for $s_i/s_1=0.2$ after 5 iterations, $0.36$ after 25 and $0.02$ after 100. The data-fitting solution contains the noise, so these directions are those in which further iterations would start to fit it, at about the iterations where the PSNR declines (10 to 100); this is what classical semi-convergence of iterative regularisation predicts. It is consistent with the data, not a test of the mechanism. In particular, the tuned $k$ is also $5$ at $\sigma=0$ (E1), so noise fitting cannot be the only cause; we did not record the iteration curve on noise-free data.
 
 \begin{table}[htbp]
 \centering\small\setlength{\tabcolsep}{4pt}
@@ -311,15 +308,15 @@ Shepp--Logan            & 19.19 & 15.03 & 12.40 & 16.36 \,(0.1, 1) & 14.77 \\
 The in-distribution benefit of early stopping and the shift deficit may share a cause, namely that more iterations let the prior shape the result further, but this is an interpretation and was not tested.
 
 \paragraph{Caveats.}
-(a)~Single noise draw, one denoiser, four $\sigma_d$ values, and checkpoints rather than every iteration (the peak lies between $k=5$ and $10$; a per-iteration curve on 50 images in an earlier version of this figure peaked at about $k=5$ for $\sigma_d=0.1$). (b)~The band decomposition is reported for $\sigma_d=0.1$ only. (c)~The ``best'' setting in Table~\ref{tab:e5} is chosen on test data.
-(d)~Inverse-crime data; Section~\ref{sec:nullspace-results} repeats the analysis on crime-free data.
+(a)~Single noise draw, one denoiser, four $\sigma_d$ values, and checkpoints rather than every iteration, so the peak is located only to the checkpoint grid (a per-iteration run on 50 images, not shown, peaked at about $k=5$ for $\sigma_d=0.1$). (b)~The band decomposition is reported for $\sigma_d=0.1$ only. (c)~The ``best'' setting in Table~\ref{tab:e5} is chosen on test data.
+(d)~Inverse-crime data and TV-ADMM only. Section~\ref{sec:nullspace-results} gives the error decomposition on finer-grid data and the iteration sweep on inverse-crime and bilinear data (Table~\ref{tab:nullspace-k}); no bicubic iteration sweep was run.
 
 
 \subsection{E6: Sensitivity to the inverse crime}\label{sec:crime-results}
 \paragraph{Setting.}
 E1--E5 generate the data with the reconstruction matrix $A$. Here the measurements are instead simulated on a five-times finer grid with three object resamplings (nearest, bicubic, bilinear; Section~\ref{sec:crimefree}), and compared with the inverse-crime data. The mean model error
 $\lVert\mathcal{S}(x)-Ax\rVert_2$ is $0$, $0.03$, $0.09$ and $0.10$ for the inverse crime, nearest, bicubic and bilinear data (20 angles); for comparison, the noise norm $\sigma\sqrt m$ is $0.28$, $1.41$, $2.83$ and $5.66$ for $\sigma=0.01,0.05,0.1,0.2$.
-With crime-free data the case $\sigma=0$ is therefore not noise-free: the only error in the measurements is the model error. Hyper-parameters of all methods are re-tuned for each data model. The PnP$-$TV gaps below are against TV-ADMM unless stated; there is one noise draw and one denoiser per cell.
+With finer-grid data the case $\sigma=0$ is therefore not noise-free: the only error in the measurements is the model error. Hyper-parameters of all methods are re-tuned for each data model. The PnP$-$TV gaps below are against TV-ADMM unless stated; there is one noise draw and one denoiser per cell.
 
 \begin{table}[htbp]
 \centering\small\setlength{\tabcolsep}{5pt}
@@ -357,21 +354,20 @@ Fine grid, bilinear           & $+2.17$ & $+3.23$ & $+3.94$ & $+4.04$ & $+3.57$ 
 
 \begin{table}[htbp]
 \centering\small\setlength{\tabcolsep}{5pt}
-\caption{As Table~\ref{tab:e1e2}, with measurements simulated on the finer grid (bicubic, $f=5$); mean test PSNR (dB) over 200 digits. The last column is the PnP$-$TV-ADMM gap.
-Intervals and TV-box results are in Table~\ref{tab:e1e2gap}.}\label{tab:table1fine}
-\begin{tabular}{lccccc}
+\caption{As Table~\ref{tab:e1e2}, with measurements simulated on the finer grid (bicubic, $f=5$); mean test PSNR (dB) over 200 digits. The PnP$-$TV-ADMM gaps are the bicubic rows of Tables~\ref{tab:crime} and~\ref{tab:crimeang}; intervals and TV-box results are in Table~\ref{tab:e1e2gap}.}\label{tab:table1fine}
+\begin{tabular}{lcccc}
 \toprule
-Condition & FBP & Tikhonov & TV-ADMM & PnP-DnCNN & PnP$-$TV\\
+Condition & FBP & Tikhonov & TV-ADMM & PnP-DnCNN \\
 \midrule
-$\sigma=0$, 20 angles    & 24.3 & 27.4 & 33.2 & 29.9 & $-3.29$\\
-$\sigma=0.01$, 20 angles & 23.2 & 23.9 & 28.4 & 29.4 & $+1.02$\\
-$\sigma=0.05$, 20 angles & 15.5 & 17.1 & 20.1 & 24.1 & $+4.02$\\
-$\sigma=0.1$, 20 angles  & 10.4 & 14.7 & 16.8 & 19.9 & $+3.10$\\
-$\sigma=0.2$, 20 angles  &  6.6 & 12.9 & 14.3 & 15.3 & $+1.08$\\
-5 angles, $\sigma=0.05$  &  9.1 & 14.1 & 15.5 & 17.8 & $+2.36$\\
-10 angles, $\sigma=0.05$ & 12.1 & 15.9 & 18.2 & 21.5 & $+3.29$\\
-40 angles, $\sigma=0.05$ & 18.1 & 18.2 & 21.8 & 25.8 & $+3.97$\\
-90 angles, $\sigma=0.05$ & 20.7 & 20.0 & 24.1 & 27.3 & $+3.24$\\
+$\sigma=0$, 20 angles    & 24.3 & 27.4 & 33.2 & 29.9 \\
+$\sigma=0.01$, 20 angles & 23.2 & 23.9 & 28.4 & 29.4 \\
+$\sigma=0.05$, 20 angles & 15.5 & 17.1 & 20.1 & 24.1 \\
+$\sigma=0.1$, 20 angles  & 10.4 & 14.7 & 16.8 & 19.9 \\
+$\sigma=0.2$, 20 angles  &  6.6 & 12.9 & 14.3 & 15.3 \\
+5 angles, $\sigma=0.05$  &  9.1 & 14.1 & 15.5 & 17.8 \\
+10 angles, $\sigma=0.05$ & 12.1 & 15.9 & 18.2 & 21.5 \\
+40 angles, $\sigma=0.05$ & 18.1 & 18.2 & 21.8 & 25.8 \\
+90 angles, $\sigma=0.05$ & 20.7 & 20.0 & 24.1 & 27.3 \\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -383,15 +379,15 @@ $\sigma=0.2$, 20 angles  &  6.6 & 12.9 & 14.3 & 15.3 & $+1.08$\\
 \end{figure}
 
 \paragraph{Results.}
-\emph{(i) The conclusions at $\sigma\ge0.05$ do not depend on the data model.} The model error is at most 7\% of the noise norm there, and the PnP$-$TV-ADMM gap differs between the inverse-crime and the bicubic data by at most $0.16$\,dB in the noise sweep (Table~\ref{tab:crime}) and $0.26$\,dB in the angle sweep (Table~\ref{tab:crimeang}); between the inverse-crime and the bilinear data it differs by up to $0.53$\,dB (90 angles).
-Against TV-box the gap is $0.4$ to $0.5$\,dB smaller than against TV-ADMM on both data models but keeps its sign (Table~\ref{tab:crime}, last rows).
+\emph{(i) The conclusions at $\sigma\ge0.05$ do not depend on the data model.} The model error is at most about 7\% of the noise norm there, and the PnP$-$TV-ADMM gap differs between the inverse-crime and the bicubic data by at most $0.16$\,dB in the noise sweep (Table~\ref{tab:crime}) and $0.26$\,dB in the angle sweep (Table~\ref{tab:crimeang}); between the inverse-crime and the bilinear data it differs by up to $0.53$\,dB (90 angles).
+At $\sigma\ge0.05$ the gap against TV-box is about $0.4$ to $0.5$\,dB smaller than against TV-ADMM on both data models but keeps its sign (Table~\ref{tab:crime}, last rows).
 
 \emph{(ii) The low-noise end depends on the data model, and also on the TV solver.} At $\sigma=0$ TV is ahead of PnP in every variant, by $6.4$\,dB (inverse crime), $5.9$ (nearest), $3.3$ (bicubic) and $1.0$\,dB (bilinear); against TV-box the lead is larger ($12.9$\,dB, with the TV-box optimum below the $\lambda$ grid, and $5.1$\,dB). At $\sigma=0.01$ the PnP lead against TV-ADMM ranges from $+0.07$ to $+1.76$\,dB across the four data models, and against TV-box it is $-0.75$\,dB (inverse crime) or $+0.35$\,dB (bicubic).
-The ranking at $\sigma\le0.01$ is therefore not a single number: it changes with the data model by up to $5.5$\,dB at $\sigma=0$ and changes sign with the choice of TV solver and data model at $\sigma=0.01$. We make no claim about PnP versus TV at $\sigma\le0.01$ from the digit experiments. A possible reading is that TV, tuned for $\sigma\approx0$, fits the data almost exactly and is penalised when the data contain model error, whereas PnP is not; we did not test this.
+The ranking at $\sigma\le0.01$ is therefore not a single number: against TV-ADMM it changes with the data model by up to $5.5$\,dB at $\sigma=0$, and at $\sigma=0.01$ it changes sign with the choice of TV solver and data model. We make no claim about PnP versus TV at $\sigma\le0.01$ from the digit experiments. A possible reading is that TV, tuned for $\sigma\approx0$, fits the data almost exactly and is penalised when the data contain model error, whereas PnP is not; we did not test this.
 
 \emph{(iii) Out-of-distribution deficits persist.} With the pipeline of E4 the PnP$-$TV-ADMM gap is $-3.05$ (inverse crime), $-3.04$, $-2.82$ and $-3.88$\,dB on Fashion-MNIST, and $-4.16$, $-4.16$, $-4.21$ and $-5.37$\,dB on the phantom, for the four data models in the order of Table~\ref{tab:crime}; the in-distribution EMNIST advantage stays between $+1.8$ and $+1.9$\,dB. The deficits are largest for the bilinear data, whose object is the smoothest.
 
-\emph{(iv) The default data model.} We use the bicubic data as the default crime-free setting for the later experiments. The choice was made after seeing all four variants, because its low-noise results lie between those of the nearest and the bilinear data; it is a convention, not a derived optimum, and the results at $\sigma\le0.01$ should be read as the band spanned by the variants.
+\emph{(iv) The default data model.} We use the bicubic data as the default finer-grid setting for the later experiments. The choice was made after seeing all four variants, because its low-noise results lie between those of the nearest and the bilinear data; it is a convention, not a derived optimum, and the results at $\sigma\le0.01$ should be read as the band spanned by the variants.
 
 \paragraph{Caveats.}
 (a)~One noise draw and one denoiser per cell; hyper-parameters are re-tuned for each data model, so part of the differences between rows is tuning. (b)~The model error is a deterministic resampling difference, not the unknown mismatch of a real scanner; the real-data setting is addressed in Stage~3 (Section~\ref{sec:e14}).
@@ -400,7 +396,7 @@ The ranking at $\sigma\le0.01$ is therefore not a single number: it changes with
 
 \subsection{E7: Error decomposition along the singular vectors}\label{sec:nullspace-results}
 \paragraph{Setting.}
-We apply the decomposition of Section~\ref{sec:subspace} to the shift setting of E4 on crime-free (bicubic) data: the MNIST-trained denoiser with the pipeline tuned on MNIST and frozen, $\sigma=0.05$, 20 angles, 200 test images per set (the phantom: 20 noise draws of one image).
+We apply the decomposition of Section~\ref{sec:subspace} to the shift setting of E4 on finer-grid (bicubic) data: the MNIST-trained denoiser with the pipeline tuned on MNIST and frozen, $\sigma=0.05$, 20 angles, 200 test images per set (the phantom: 20 noise draws of one image).
 The weakly determined subspace is $W_{0.05}$ ($s_i<0.05\,s_1$, $\dim W_{0.05}=319$ of 784, containing the 79-dimensional exact null space); $W^\perp$ is its complement. We report the squared error in each part as the ratio PnP/TV-ADMM (below 1: PnP has less error),
 with the injection $\iota$ and alignment $c$ statistics. Paired Wilcoxon tests on the per-image errors give $p<10^{-10}$ for every ratio of the three 200-image sets in Table~\ref{tab:nullspace}; for the phantom, with 20 noise draws, $p=1.9\times10^{-6}$ is the smallest value attainable.
 
@@ -467,21 +463,21 @@ Shepp--Logan     & 2.60 & 1.92 (1) & 4.77 & 3.44 & 1.89 (1) & 4.58\\
 
 \paragraph{Results.}
 \emph{(i) In distribution the advantage is not confined to the unobserved directions.} On MNIST PnP has $0.48$ times TV's error in $W_{0.05}$ and $0.40$ times in its complement, and its content in $W_{0.05}$ is better aligned with the truth ($c=0.76$ against $0.45$). The same holds for EMNIST letters ($0.70$ and $0.64$).
-Since a gradient step never changes the null-space component, the null-space error reduction (ratio $0.49$ in the exact null space, Table~\ref{tab:nullspace-tau}) is entirely due to the denoiser.
+A gradient step never changes the null-space component, so the null-space error reduction (ratio $0.49$ in the exact null space, Table~\ref{tab:nullspace-tau}) is attributable to the denoiser, up to the clipping and the FBP initial image.
 
 \emph{(ii) Under shift the excess error is mostly in the observed directions.} On Fashion-MNIST the ratios are $1.27$ in $W_{0.05}$ and $2.32$ in $W^\perp$, on the phantom $2.59$ and $2.64$. Because $W^\perp$ contains most of the error energy, $93\%$ (Fashion-MNIST) and $89\%$ (phantom) of PnP's excess error over TV lies outside $W_{0.05}$.
 The failure under shift is therefore not confined to the weakly determined subspace. These conclusions hold for the exact null space and for $W_{0.10}$ (Table~\ref{tab:nullspace-tau}); the phantom injection falls from $3.7$ to $2.7$ with the threshold but stays above 1 throughout.
 
 \emph{(iii) The injection--alignment signature separates the two shifted sets.} On the phantom PnP places $3.3$ times the true energy in $W_{0.05}$ (TV: $0.44$) with an alignment of only $0.23$ (TV: $0.09$; Figure~\ref{fig:signature}), whereas on MNIST its injection of $0.76$ comes with an alignment of $0.76$.
-On Fashion-MNIST the injection is $0.80$ with alignment $0.37$, no different from TV: PnP's excess error there lies in $W^\perp$ and is not visible in this statistic. The statistic does not by itself distinguish prior-driven structure from amplified noise (Section~\ref{sec:subspace});
+On Fashion-MNIST the injection is $0.80$ (TV: $0.29$) with an alignment of $0.37$, no different from TV's ($0.36$): PnP's excess error there lies in $W^\perp$ and is not visible in this statistic. The statistic does not by itself distinguish prior-driven structure from amplified noise (Section~\ref{sec:subspace});
 the evidence that the phantom injection is driven by the prior is the comparison of E8, where denoisers trained on Fashion-MNIST give an injection of $0.30$--$0.35$ against $2.8$--$3.4$ for MNIST-trained ones, with identical noise and solver.
 
-\emph{(iv) Iterations.} The gradient step, ignoring the denoiser, contracts the error in direction $i$ after $k$ iterations by $(1-(s_i/s_1)^2)^k$: at $k=5$ a direction with $s_i=0.1\,s_1$ retains $95\%$ of its initial error, $s_i=0.3\,s_1$ $62\%$ and $s_i=0.5\,s_1$ $24\%$, so the tuned iteration leaves a large share of directions to the denoiser.
+\emph{(iv) Iterations.} Without the denoiser, the gradient step contracts the distance to the data-fitting solution in direction $i$ after $k$ iterations by $(1-(s_i/s_1)^2)^k$: at $k=5$ a direction with $s_i=0.1\,s_1$ retains $95\%$ of its initial distance, $s_i=0.3\,s_1$ $62\%$ and $s_i=0.5\,s_1$ $24\%$, so the tuned iteration leaves a large share of directions to the denoiser.
 On the shifted sets no setting recovers TV's accuracy: even the best $k$ at $\sigma_d=0.1$ has $1.5$--$1.9$ times TV's error, and the error grows with $k$ to $3.7$--$4.8$ times at $k=400$ (Table~\ref{tab:nullspace-k}). In distribution the converged iterate ($k=400$) remains better than TV on MNIST ($0.65$--$0.71$) and is on par with it on EMNIST letters ($0.93$--$1.01$). Section~\ref{sec:e5} shows where along the singular-value axis the error grows with $k$.
 
 \paragraph{Caveats.}
 (a)~All statistics are for one denoiser, one noise draw per image and one data model per table; the phantom is a single object. (b)~The threshold $\tau=0.05$ is a convention (there is no gap in the singular values); Table~\ref{tab:nullspace-tau} shows that the conclusions do not depend on it, but the numbers do. (c)~The error ratio is a ratio of means of squared errors; the Wilcoxon tests are paired over images.
-(d)~Table~\ref{tab:nullspace-k} uses two data models other than the one of Table~\ref{tab:nullspace} (no bicubic iteration sweep was run), and the best $k$ is selected on the test images.
+(d)~Table~\ref{tab:nullspace-k} uses two data models other than the one of Table~\ref{tab:nullspace} (no bicubic iteration sweep was run), and the best $k$ is selected on the test images. (e)~The comparison is against TV-ADMM only.
 
 
 \subsection{E8: Denoiser seeds and matched-prior control}\label{sec:seeds-results}
@@ -493,28 +489,29 @@ and \emph{f03} (Fashion-MNIST, $\sigma_{\max}=0.3$). Within each run all methods
 family's own training distribution, then frozen; the noise-level grid for $\sigma_d$ was extended to $0.5$.
 
 \paragraph{Seed variation.} Seed-to-seed variation of the gap is at most $0.3$\,dB (standard deviation over three seeds), an order of
-magnitude below the effects of interest. On Fashion-MNIST the MNIST-trained prior is $3.10\pm0.30$\,dB below TV-ADMM (range
-$-3.43$ to $-2.83$) and on the phantom $4.33\pm0.12$\,dB below. Training with $\sigma_{\max}=0.5$ instead of $0.3$ leaves
-these results essentially unchanged (Fashion-MNIST $-3.12\pm0.31$, phantom $-3.94\pm0.02$\,dB). With three seeds the standard
+magnitude below the in-distribution and shift effects. On Fashion-MNIST the MNIST-trained prior is $3.10\pm0.30$\,dB below TV-ADMM (range
+$-3.43$ to $-2.83$) and on the phantom $4.33\pm0.12$\,dB below. Training with $\sigma_{\max}=0.5$ instead of $0.3$ leaves the Fashion-MNIST gap unchanged ($-3.12\pm0.31$\,dB) and
+reduces the phantom deficit by $0.4$\,dB ($-3.94\pm0.02$\,dB). With three seeds the standard
 deviations are themselves imprecise, so we read them as an indication of scale rather than as interval estimates.
 The sign of every shift effect in Table~\ref{tab:seeds} is the same for all seeds.
 
 \paragraph{Noise-level grid.} At $\sigma=0.2$ the tuned $\sigma_d$ is $0.3$ for all six MNIST-trained denoisers even though values
 up to $0.5$ were available, so the choice of $\sigma_d$ in E1 was not limited by the edge of its grid. The wider-range
-denoiser is better at high noise ($+1.44\pm0.11$ versus $+0.97\pm0.11$\,dB over TV at $\sigma=0.2$, ranges not overlapping)
+denoiser (m05) is better at high noise ($+1.44\pm0.11$ versus $+0.97\pm0.11$\,dB over TV at $\sigma=0.2$, ranges not overlapping)
 and slightly worse at $\sigma=0.05$ ($+3.86$ versus $+4.01$\,dB in the noise sweep, and $+3.68\pm0.13$ versus $+3.84\pm0.03$\,dB in
 Table~\ref{tab:seeds}). The in-distribution gap at $\sigma=0.05$ therefore depends on $\sigma_{\max}$ by a few tenths of a dB; the
-headline gap of about $3.4$\,dB over box-constrained TV (Sec.~\ref{sec:experiments}, E1--E2) uses the m03 family.
+headline gap of about $3.4$\,dB over box-constrained TV (E1--E2) uses the m03 family.
 
 \paragraph{Matched-prior control.} The control isolates the cause of the reversal. A prior trained on Fashion-MNIST beats TV on
 Fashion-MNIST by $+2.21\pm0.01$\,dB (total-error ratio $0.63$), although by less than the MNIST prior on MNIST
-($+3.84$\,dB), consistent with Fashion-MNIST images being less sparse. The control is clean in the following sense: the
+($+3.84$\,dB), possibly because Fashion-MNIST images are less sparse (untested). The control is clean in the following sense: the
 tuned hyperparameters are identical in all nine runs ($\sigma_d=0.1$, $k=5$, $\lambda_{\rm TV}=5.6\times10^{-3}$), including the three
 tuned on Fashion-MNIST validation data, and the TV-ADMM PSNR is therefore identical for every prior on every test set. The
-only difference between the MNIST-trained and the Fashion-trained pipelines is thus the denoiser weights. Transfer is asymmetric:
-the Fashion-trained prior still beats TV on MNIST ($+1.38$\,dB) and EMNIST letters ($+0.44$\,dB) and is indistinguishable from TV
-on the phantom ($-0.18\pm0.08$\,dB, error ratio $1.05$), whereas the MNIST-trained prior loses by $4.3$\,dB on the phantom.
-The injection statistic $\iota$ (Sec.~\ref{sec:subspace}) on the phantom follows the prior: $2.8$--$3.4$ for MNIST-trained denoisers versus
+only difference between the MNIST-trained and the Fashion-trained pipelines is thus the denoiser weights. Whether re-tuning $(\sigma_d,k)$ could rescue the MNIST-trained prior on Fashion-MNIST is examined in E10 (Section~\ref{sec:oppoint-results}).
+Transfer is asymmetric:
+the Fashion-trained prior still beats TV on MNIST ($+1.38$\,dB) and EMNIST letters ($+0.44$\,dB) and is close to TV
+on the phantom ($-0.18\pm0.08$\,dB against TV-ADMM, $-0.05$\,dB against TV-box; error ratio $1.05$), whereas the MNIST-trained prior loses by $4.3$\,dB on the phantom.
+The injection statistic $\iota$ (Section~\ref{sec:subspace}) on the phantom follows the prior: $2.8$--$3.4$ for MNIST-trained denoisers versus
 $0.30$--$0.35$ for Fashion-trained ones, with identical noise and solver settings; on Fashion-MNIST itself it is $0.75$--$0.83$
 versus $0.40$--$0.42$. Whether the broader prior helps because it is richer or because Fashion-MNIST resembles the phantom
 more cannot be decided with two training distributions.
@@ -529,7 +526,7 @@ MNIST-tuned ones because its weight was re-tuned on Fashion-MNIST validation dat
 \begin{table}[htbp]
 \centering\small\setlength{\tabcolsep}{3.5pt}
 \caption{Distribution shift with three denoisers per prior. Mean test PSNR in dB over seeds; gap = PnP$-$TV, mean $\pm$ s.d.\ over
-seeds, against TV-ADMM and against box-constrained TV (TV-box; m03 and f03 only). Bicubic fine-grid data, $\sigma=0.05$, 20 angles;
+seeds, against TV-ADMM and against box-constrained TV (TV-box; m03 and f03 only; for f03 the box gap has no s.d.\ entry). Bicubic fine-grid data, $\sigma=0.05$, 20 angles;
 each prior's pipeline is tuned on the validation set of its own training distribution.}\label{tab:seeds}
 \begin{tabular}{lcccccccc}
 \toprule
@@ -537,10 +534,10 @@ each prior's pipeline is tuned on the validation set of its own training distrib
 \cmidrule(lr){2-3}\cmidrule(lr){4-6}\cmidrule(lr){7-9}
 Test set & ADMM & box & PnP & gap & gap (box) & PnP & gap & gap (box)\\
 \midrule
-MNIST          & 20.21 & 20.69 & 24.05 & $+3.84\pm0.03$ & $+3.36$ & 21.60 & $+1.38\pm0.09$ & $+1.44$\\
-EMNIST letters & 20.28 & 20.35 & 22.07 & $+1.79\pm0.09$ & $+1.72$ & 20.73 & $+0.44\pm0.09$ & $+0.38$\\
-Fashion-MNIST  & 19.42 & 19.45 & 16.32 & $-3.10\pm0.30$ & $-3.13$ & 21.63 & $+2.21\pm0.01$ & $+2.17$\\
-Shepp--Logan   & 19.28 & 19.50 & 14.96 & $-4.33\pm0.12$ & $-4.55$ & 19.10 & $-0.18\pm0.08$ & $-0.05$\\
+MNIST          & 20.21 & 20.69 & 24.05 & $+3.84\pm0.03$ & $+3.36\pm0.03$ & 21.60 & $+1.38\pm0.09$ & $+1.44$\\
+EMNIST letters & 20.28 & 20.35 & 22.07 & $+1.79\pm0.09$ & $+1.72\pm0.09$ & 20.73 & $+0.44\pm0.09$ & $+0.38$\\
+Fashion-MNIST  & 19.42 & 19.45 & 16.32 & $-3.10\pm0.30$ & $-3.13\pm0.30$ & 21.63 & $+2.21\pm0.01$ & $+2.17$\\
+Shepp--Logan   & 19.28 & 19.50 & 14.96 & $-4.33\pm0.12$ & $-4.55\pm0.12$ & 19.10 & $-0.18\pm0.08$ & $-0.05$\\
 \bottomrule
 \end{tabular}
 
@@ -563,7 +560,7 @@ in-distribution noise sweep for MNIST-trained denoisers with $\sigma_{\max}=0.3$
 Table~\ref{tab:lesion} and Figure~\ref{fig:lesion-summary} summarise the lesion experiment (three denoisers per prior,
 protocol of Section~\ref{sec:lesion}; $157$--$197$ valid images per lesion type). TV denotes the ADMM implementation used throughout
 the paper; TV-box is the same comparison with the constraint $0\le x\le1$, re-tuned on the same validation split (m03 and f03 families,
-same lesion locations and noise seeds). Three observations hold across lesion types.
+same lesion locations and noise seeds). Three observations summarise the eight lesion types.
 
 \emph{TV detects small lesions better than PnP, in distribution and for a matched prior.} For the MNIST-trained prior on MNIST
 the paired AUC of PnP is $0.04$--$0.23$ below TV's (for example $0.69$ versus $0.91$ for $\sigma_l=0.75$, $c=0.5$), although
@@ -573,19 +570,18 @@ $0.03$--$0.15$ for the matched prior), so the box constraint does not explain it
 than PnP (paired AUC $0.92$ at $\sigma_l=0.75$, $c=0.5$ on MNIST for FBP), at the cost of many false blobs (up to $6$ per image
 for FBP).
 
-\emph{In distribution PnP attenuates lesions and invents none.} Its retention is $0.12$--$0.78$ for the MNIST prior on MNIST
+\emph{In distribution PnP attenuates lesions and creates almost no false lesions.} Its retention is $0.12$--$0.78$ for the MNIST prior on MNIST
 and $0.16$--$0.49$ for the matched prior (TV: $0.29$--$0.88$ and $0.38$--$0.83$; TV-box: $0.31$--$0.92$ and $0.33$--$0.82$), and it
 produces at most $0.01$ false lesions per image against up to $0.26$ for TV and, for the MNIST-tuned TV-box, up to $0.49$
 (smallest low-contrast lesion; $0.075$ for the Fashion-tuned TV-box). The reconstructions are cleaner than TV's but the inserted lesion is often absent
-(Figure~\ref{fig:lesion-examples}), so a visually convincing image does not imply a faithful one.
+(Figure~\ref{fig:lesion-examples}), so a visually clean image does not imply a faithful one.
 
-\emph{Under prior mismatch PnP invents structure, but box-constrained TV does too for the smallest lesions.} For the MNIST-trained
-prior on Fashion-MNIST the retention is $0.78$--$1.04$ (the lesion survives) but there are $0.20$--$0.66$ false lesions per image
+\emph{Under prior mismatch PnP creates false lesions, but box-constrained TV does too for the smallest lesions.} For the MNIST-trained
+prior on Fashion-MNIST the retention is $0.78$--$1.04$ (the lesion survives, although invented contrast may contribute) but there are $0.20$--$0.66$ false lesions per image
 against $\le0.20$ for TV, and the paired AUC remains below TV's by $0.05$--$0.16$. The matched Fashion-trained prior on the same
 images produces at most $0.01$. The box-constrained TV is a stricter comparison here: its false-lesion rate on the shifted images is $0.005$--$0.48$ per image, and for
 the smallest low-contrast lesion type ($\sigma_l=0.5$, $c=0.25$) it exceeds PnP's ($0.48$ versus $0.38$). For the other seven lesion types PnP's rate is higher, by a factor
-of $1.4$ to $50$. The claim that a mismatched learned prior invents more
-structure than the classical regulariser therefore holds for TV-box on seven of eight lesion types, not on all of them.
+of $1.4$ to $50$. The claim that a mismatched learned prior creates more false lesions than the classical regulariser therefore holds for TV-box on seven of eight lesion types, not on all of them.
 Lesion observability (Section~\ref{sec:lesion}) does not explain these differences: the observability terciles formed within each
 lesion type have mean observability $0.88$, $0.92$ and $0.94$, and PnP's paired AUC does not increase with observability (on MNIST
 it falls from $0.82$ in the lowest to $0.67$ in the highest tercile); smaller lesions are harder for all methods, but this is
@@ -593,7 +589,7 @@ confounded with size.
 
 \begin{table}[htbp]
 \centering\small\setlength{\tabcolsep}{3pt}
-\caption{Lesion insertion, mean over three denoisers per prior (200 test images, $\sigma=0.05$, 20 angles, bicubic data), for two
+\caption{Lesion insertion, mean over three denoisers per prior ($157$--$197$ valid test images per lesion type, $\sigma=0.05$, 20 angles, bicubic finer-grid data), for two
 of the eight lesion types ($\sigma_l/c$ = lesion size in px / contrast). pAUC: paired AUC; Ret.: retention; FL: false lesions per
 lesion-absent image; TV-box: TV with $0\le x\le1$. All methods use their PSNR-tuned settings.}\label{tab:lesion}
 \begin{tabular}{llccccccccc}
@@ -627,13 +623,15 @@ implementation; TV-box values are in Table~\ref{tab:lesion} and \texttt{results/
 \includegraphics[width=0.85\linewidth]{figures/lesion_f03_s2_examples_fashion.png}
 \caption{Matched Fashion-trained prior on Fashion-MNIST ($\sigma_l=0.75$, $c=0.5$). Rows: ground truth with lesion, TV and
 PnP reconstructions of the lesion-present image; ground truth, TV and PnP reconstructions of the lesion-absent image. The
-red circle marks the lesion location. PnP produces the cleaner images but removes the lesion.}\label{fig:lesion-examples}
+red circle marks the lesion location. In these examples PnP produces the cleaner images but removes the lesion.
+}\label{fig:lesion-examples}
 \end{figure}
 
 \paragraph{Scope.} The observer is a location-known local-contrast statistic and the lesions are additive Gaussian blobs on
-$28\times28$ digits, so these results say how each \emph{reconstruction} preserves or invents a simple signal, not how a human or a
+$28\times28$ digits, so these results say how each \emph{reconstruction} preserves or creates a simple signal, not how a human or a
 model observer would perform on clinical images. False-lesion counts depend on the response threshold $\theta$, which scales with the
-nominal lesion, so they are compared across methods within a lesion type, not across types.
+nominal lesion, so they are compared across methods within a lesion type, not across types. No paired intervals were computed for the AUC differences; with
+$157$--$197$ valid images the binomial standard error of a paired AUC is about $0.02$--$0.04$, so differences below about $0.05$ should be read as ties.
 
 
 \subsection{E10: Can re-tuning recover lesion detectability?}\label{sec:oppoint-results}
@@ -655,8 +653,7 @@ false lesions per image, so no rule could have closed the gap for this prior wit
 
 \paragraph{Fashion-trained prior.} In distribution (Fashion-MNIST) the constrained point keeps $+1.0$\,dB over TV with a paired AUC
 $0.02$--$0.03$ below TV's and $0.085$ false lesions per image against $0.03$ for TV. A difference of this size is comparable to the
-binomial standard error of a paired AUC with $170$--$190$ valid images ($\approx0.02$--$0.03$); we did not compute a paired interval, so we
-describe it as close to TV's, not as equal. On the shifted MNIST images the constrained point keeps $+1.0$\,dB, with a paired AUC $0.02$--$0.06$ below TV's and
+binomial standard error of a paired AUC with $170$--$190$ valid images ($\approx0.02$--$0.03$), so we describe it as close to TV's, not as equal. On the shifted MNIST images the constrained point keeps $+1.0$\,dB, with a paired AUC $0.02$--$0.06$ below TV's and
 $0.015$ false lesions per image against $0.005$.
 
 \paragraph{Under mismatch.} Operating points chosen in distribution do not protect the MNIST-trained prior on Fashion-MNIST: all
@@ -664,16 +661,15 @@ three rules are $2.1$--$2.8$\,dB below TV in PSNR and produce $0.40$--$0.51$ fal
 artefact of the selection rule: none of the $45$ PnP settings in the grid reaches TV's PSNR on the shifted images (the best is $17.96$
 versus $19.37$\,dB), even when judged on the test set itself.
 
-\paragraph{Summary.} PSNR, detectability and fabricated structure trade against each other for PnP, and only the Fashion-trained
-prior leaves a point at which PnP stays above TV in PSNR with a detection close to TV's and few false lesions. This holds for it on Fashion-MNIST and on
-MNIST, i.e.\ for one in-distribution and one shifted test set, but for the MNIST-trained prior it holds on neither test set. The difference between the priors is therefore the breadth of the training
-distribution (E8), not whether a test set is formally in-distribution. With one denoiser per prior this is a statement about two networks.
+\paragraph{Summary.} PSNR, detectability and false lesions trade against each other for PnP. Only the Fashion-trained prior leaves an operating point at which PnP stays about
+$1$\,dB above TV in PSNR with a detection within $0.02$--$0.06$ AUC of TV's and few false lesions, and it does so on both Fashion-MNIST (in distribution) and MNIST (shifted); for the MNIST-trained prior no such point exists on either test set.
+We hypothesise that the difference between the priors lies in the variety of their training distributions (E8) rather than in whether a test set is formally in distribution; with one denoiser per prior and two training sets this is a statement about two networks and is not tested.
 
 \begin{table}[htbp]
 \centering\small\setlength{\tabcolsep}{4pt}
 \caption{Operating points for lesion type $\sigma_l=0.75$, $c=0.5$ on the test sets (one denoiser per prior; points chosen on
-held-out in-distribution validation images). PSNR is that of the lesion-absent reconstruction. ``TV, lesion'' is TV with the weight
-that maximises paired AUC on the selection set.}\label{tab:oppoint}
+held-out in-distribution validation images of the prior's own training distribution). PSNR is that of the lesion-absent reconstruction. ``TV, lesion'' is TV with the weight
+that maximises paired AUC on the selection set, which differs between priors, so its row can differ for the same test set.}\label{tab:oppoint}
 \begin{tabular}{llccc}
 \toprule
 Prior $\to$ test set & Operating point & PSNR (dB) & pAUC & FL\\
@@ -713,27 +709,26 @@ operating points. Left: in distribution; right: Fashion-MNIST (shifted).}\label{
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth]{figures/oppoint_f03_s0.png}
-\caption{As Figure~\ref{fig:oppoint} for the Fashion-trained denoiser. Left: MNIST (shifted); right: Fashion-MNIST (in distribution).
-Both figures are produced by \texttt{run\_oppoint.py}.}\label{fig:oppoint-f}
+\caption{As Figure~\ref{fig:oppoint} for the Fashion-trained denoiser. Left: MNIST (shifted); right: Fashion-MNIST (in distribution).}\label{fig:oppoint-f}
 \end{figure}
 
 
 \subsection{E11: The matrix-free operator reproduces the dense pipeline}\label{sec:mf-results}
 Table~\ref{tab:mf} compares the two implementations on the same 200 noisy test images ($\sigma=0.05$, 20 angles, bicubic
-fine-grid data). The comparison uses fixed, untuned settings (Tikhonov and TV weight $10^{-2}$; PnP with $\sigma_d=0.1$ and $k=25$), so its PSNR values
+finer-grid data). The comparison uses fixed, untuned settings (Tikhonov and TV weight $10^{-2}$; PnP with $\sigma_d=0.1$ and $k=25$), so its PSNR values
 are not comparable to the tuned values of E1--E2; only the agreement between the two implementations matters here.
 The projections agree to $3\times10^{-7}$ in relative norm, and the three reconstruction methods agree to
 $\le10^{-5}$ (Tikhonov, TV) and $3\times10^{-4}$ (PnP) in relative norm, with identical PSNR to three decimals. The slightly larger PnP difference
 is plausible given that the denoiser is applied $25$ times to slightly different iterates, but we did not isolate its source.
 
 The randomized SVD reproduces the singular values of the dense SVD to within $1.1\times10^{-4}\,s_1$ for the first $400$ and
-$6.2\times10^{-5}\,s_1$ for the first $600$ (the number used to build the subspace in E7). It finds the same $465$-dimensional well-determined
+$6.2\times10^{-5}\,s_1$ for the first $600$ (the number used to build the subspace in E7).
+It finds the same $465$-dimensional well-determined
 subspace $\{i:s_i/s_1\ge0.05\}$ (so $319$ directions are weakly determined). The resulting strong/weak error split differs from the dense one by at most
 $2.3\times10^{-4}$ of the error norm for each of the three methods (Tikhonov, TV-ADMM, PnP), far below the $1\%$ tolerance of the unit test; the strong subspace holds
-$91\%$, $82\%$ and $77\%$ of the squared error of the three reconstructions, respectively. These checks are produced by \texttt{run\_e11\_svd\_check.py} and
-are limited by single-precision arithmetic on the GPU.
+$91\%$, $82\%$ and $77\%$ of the squared error of the three reconstructions, respectively. These checks are limited by single-precision arithmetic on the GPU.
 
-At this size the dense implementation is much faster for the iterative solvers (Table~\ref{tab:mf}): the matrix-free TV-ADMM
+At this size the dense implementation is much faster for Tikhonov and TV-ADMM (Table~\ref{tab:mf}): the matrix-free TV-ADMM
 performs $100$ ADMM iterations with up to $30$ conjugate-gradient steps each, i.e.\ up to $3\times10^{3}$ forward--adjoint pairs per
 image, and the adjoint is evaluated by reverse-mode differentiation. PnP is only $1.2$ times slower because the denoiser dominates its cost.
 The timings are single runs on one GPU (RTX 3050 Ti) and should be read as orders of magnitude. The matrix-free operator is therefore a requirement for larger images, where the dense matrix cannot be stored,
@@ -769,8 +764,8 @@ under Poisson noise (in the Gaussian MNIST case it lowered the gap by $0.5$\,dB,
 \emph{Shifted data.} The MNIST-trained prior is below TV on Fashion-MNIST ($-2.0$ to $-3.1$\,dB; PnP wins on only 6--14\% of the images)
 and on the phantom ($-4.4$ to $-6.1$\,dB), as in Stage~1 ($-3.10$ and $-4.33$\,dB). At $I_0=1000$ the prior is no better than FBP on Fashion-MNIST
 ($19.72$ versus $19.77$\,dB), and on the phantom it is $3.1$\,dB below FBP ($18.07$ versus $21.20$\,dB).
-The share of the error in the complement of the well-determined subspace is $0.68$--$0.99$ of TV's on MNIST but $1.04$--$1.19$ on Fashion-MNIST
-and $1.73$--$1.79$ on the phantom (for $I_0\le300$; $0.90$ at $I_0=1000$), so the mismatch error again sits partly in the weakly determined directions. These ratios are less favourable to PnP than the
+PnP's error in the weakly determined subspace (the complement of the well-determined one) is $0.68$--$0.99$ times TV's on MNIST
+but $1.04$--$1.19$ times on Fashion-MNIST and $1.73$--$1.79$ times on the phantom (for $I_0\le300$; $0.90$ at $I_0=1000$), so the mismatch error again sits partly in the weakly determined directions. These ratios are less favourable to PnP than the
 Stage~1 values and are not directly comparable, since the noise model, the tuned settings and the subspace definition differ. The gap on Fashion-MNIST is not monotone in dose
 ($-2.45$, $-3.05$, $-2.74$, $-3.01$, $-1.98$\,dB from high to low dose); with frozen MNIST-tuned settings this reflects, at least in part, the choice of $(\sigma_d,k)$ (see the weighted variant below), so
 we read the Fashion-MNIST range as ``$2$ to $3$\,dB below TV'' and not as a dose trend.
@@ -781,13 +776,13 @@ The reversal under shift is therefore a PSNR result for Fashion-MNIST and a PSNR
 
 \emph{Weighted data term.} Using the Poisson weights in PnP gave no consistent benefit: the weighted variant was $0.14$--$0.59$\,dB below the unweighted one in 13 of the 15 non-phantom
 cells, and above it in two (EMNIST $+0.35$\,dB and Fashion-MNIST $+1.10$\,dB at $I_0=300$), where the tuned $(\sigma_d,k)$ differed ($(0.05,10)$ unweighted versus $(0.1,3)$ weighted). The
-$1.1$\,dB on Fashion-MNIST shows that the shifted-data gap depends on how the frozen settings were chosen. We report the unweighted scheme, as it is the one tuned on the same footing as in Stage~1, and note that the weighted variant would reduce the
-Fashion-MNIST gap at $I_0=300$ from $-3.05$ to about $-1.95$\,dB.
+$1.1$\,dB on Fashion-MNIST shows that the shifted-data gap depends on how the frozen settings were chosen: the weighted variant would reduce that gap at $I_0=300$ from $-3.05$ to about $-1.95$\,dB.
+We report the unweighted scheme, as it is the one tuned on the same footing as in Stage~1.
 
 \begin{table}[htbp]
 \centering\small\setlength{\tabcolsep}{4pt}
 \caption{PnP$-$TV PSNR difference (dB, mean $\pm$ standard error of the paired difference over 200 images) by photon count $I_0$, with the corresponding
-effective sinogram noise standard deviation (measured on the MNIST images; signal dependence makes it about $15$--$20\%$ higher on Fashion-MNIST); and the ratio of PnP's to TV's reconstruction error in the complement of the well-determined subspace (in brackets). Phantom: one image.}\label{tab:dose}
+effective sinogram noise standard deviation (measured on the MNIST images; signal dependence makes it about $15$--$20\%$ higher on Fashion-MNIST); and, in brackets, the ratio of PnP's to TV's reconstruction error in the complement of the well-determined subspace. Phantom: one image.}\label{tab:dose}
 \resizebox{\linewidth}{!}{%
 \begin{tabular}{lccccc}
 \toprule
@@ -831,27 +826,28 @@ We repeated the lesion experiment (Section~\ref{sec:lesion}; same lesions, obser
 Poisson data at $I_0=100$ and $I_0=30$ (effective $\sigma\approx0.06$ and $0.1$) and the matrix-free operator, tuning each method on its prior's own validation distribution
 (Table~\ref{tab:lesion-poisson}, Figure~\ref{fig:lesion-poisson}). TV is the ADMM implementation without the box constraint; the box-constrained control of E9 was run for Gaussian noise
 only. Only these two doses were run; the other three doses of E12 were not.
- 
-\emph{Erasure persists.} The paired AUC of PnP is below TV's in all four prior/test-set combinations and at both doses (differences of $-0.01$ to $-0.28$ at $I_0=100$, with one tie at $1.0$ for the largest high-contrast lesion, and $-0.02$ to $-0.19$ at $I_0=30$). For the MNIST prior on MNIST ($\sigma_l=0.75$, $c=0.5$) the paired AUC is $0.60$ against $0.89$ for TV and the retention is $0.29$ against $0.60$ at $I_0=100$,
-which is close to the Gaussian-noise values of Stage~1 ($0.69$ vs.\ $0.91$; $0.28$ vs.\ $0.59$), although PnP is $3.7$\,dB better in PSNR on the same images. At $I_0=30$ the gap narrows
-($0.63$ vs.\ $0.77$) because TV degrades faster.
- 
-\emph{Invention under mismatch persists.} For the MNIST-trained prior on Fashion-MNIST, PnP produces more false lesions than TV for lesions with $\sigma_l\ge0.75$ in 11 of the 12 dose/lesion-type cells, by factors of $1.7$--$5.5$ ($0.25$--$0.70$ against $0.06$--$0.28$ per image at $I_0=100$; the exception is $0.25$ against $0.28$). The matched Fashion-trained prior, on its own data and on MNIST, stays at $\le0.09$ false lesions per image. Retention above that of TV
+
+\emph{Attenuation persists.} The paired AUC of PnP is below TV's in all four prior/test-set combinations and at both doses (differences of $-0.01$ to $-0.28$ at $I_0=100$, with one tie at $1.0$ for the largest high-contrast lesion, and $-0.02$ to $-0.19$ at $I_0=30$).
+For the MNIST prior on MNIST ($\sigma_l=0.75$, $c=0.5$) the paired AUC is $0.60$ against $0.89$ for TV and the retention is $0.29$ against $0.60$ at $I_0=100$,
+the same pattern as with Gaussian noise (AUC $0.69$ against $0.91$; retention $0.28$ against $0.59$), although PnP is $3.7$\,dB better in PSNR on the same images. At $I_0=30$ the gap narrows
+($0.63$ against $0.77$) because TV's AUC falls while PnP's does not.
+
+\emph{False lesions under mismatch persist.} For the MNIST-trained prior on Fashion-MNIST, PnP produces more false lesions than TV for lesions with $\sigma_l\ge0.75$ in 11 of the 12 dose/lesion-type cells, by factors of $1.7$--$5.5$ ($0.25$--$0.70$ against $0.06$--$0.28$ per image at $I_0=100$; the exception is $0.25$ against $0.28$). The matched Fashion-trained prior, on its own data and on MNIST, stays at $\le0.09$ false lesions per image. Retention above that of TV
 for the mismatched prior should not be read as fidelity: invented contrast may contribute to it, although we did not separate the two.
- 
-\emph{New at the lower dose: in-distribution invention.} For the MNIST prior on MNIST at $I_0=30$, PnP produces $0.058$--$0.073$ false lesions per image for the four lesion types with $0.75\le\sigma_l\le1.25$, against $0.000$--$0.035$ for TV,
-whereas at $I_0=100$ it produces at most $0.01$ for any type. At high noise the in-distribution prior therefore starts to create lesion-like structure as well as to erase it, although at a rate far below that under mismatch.
- 
-\emph{TV has a failure of its own.} For the smallest low-contrast lesion at $I_0=100$ the TV reconstruction contains $0.63$ false lesions per image (noise blobs), against $0.01$ for PnP. The statement that PnP creates more false lesions than TV under mismatch therefore applies to lesions of $\sigma_l\ge0.75$\,px, and under a matched prior is not supported at all. As in E9, where box-constrained TV also produced false lesions for the smallest lesion type, the false-lesion rate of TV depends on its implementation, so
-the TV false-lesion counts here are those of ADMM-TV and may be different for other TV solvers.
- 
+
+\emph{New at the lower dose: false lesions in distribution.} For the MNIST prior on MNIST at $I_0=30$, PnP produces $0.058$--$0.073$ false lesions per image for the four lesion types with $0.75\le\sigma_l\le1.25$, against $0.000$--$0.035$ for TV,
+whereas at $I_0=100$ it produces at most $0.01$ for any type. At high noise the in-distribution prior therefore starts to create lesion-like structure as well as to attenuate the inserted lesion, although at a rate far below that under mismatch.
+
+\emph{TV has a failure of its own.} For the smallest low-contrast lesion at $I_0=100$ the TV reconstruction contains $0.63$ false lesions per image (noise blobs), against $0.01$ for PnP. The statement that PnP creates more false lesions than TV under mismatch therefore applies to lesions of $\sigma_l\ge0.75$\,px. Under a matched prior it is supported only at $I_0=30$, at low rates (at most about $0.07$ per image; Table~\ref{tab:lesion-poisson}), and not at $I_0=100$.
+As in E9, where box-constrained TV also produced false lesions for the smallest lesion type, the false-lesion rate of TV depends on its implementation, so
+the TV counts here are those of ADMM-TV and may be different for other TV solvers.
+
 Uncertainty is limited by the design: the error bars in Figure~\ref{fig:lesion-poisson} show the variation over three denoisers only, TV is a single run, and with about 170 valid lesions per cell the sampling error of a paired AUC is of the order of $\pm0.03$, so differences below that, such as the ties for the
-largest lesions, do not separate the methods. A tercile analysis of PnP's paired AUC by lesion observability showed a decrease with observability on MNIST images and no trend on Fashion-MNIST images; since it depends on the image set, our hypothesis is that it reflects the background around the lesion rather than the operator; we did not test this and do not interpret it
-(the same pattern appears in the Gaussian-noise data of E9).
- 
+largest lesions, do not separate the methods. A tercile analysis of PnP's paired AUC by lesion observability showed a decrease with observability on MNIST images and no trend on Fashion-MNIST images (the same pattern as in E9); we do not interpret it, and one untested possibility is the background around the lesion.
+
 \begin{table}[htbp]
 \centering\small\setlength{\tabcolsep}{3pt}
-\caption{Lesion insertion under Poisson noise, mean over three denoisers per prior (200 test images; 20 angles; bicubic data), for two of the eight lesion types.
+\caption{Lesion insertion under Poisson noise, mean over three denoisers per prior (up to 200 test images; 20 angles; bicubic finer-grid data), for two of the eight lesion types.
 pAUC: paired AUC; Ret.: retention; FL: false lesions per lesion-absent image. Each method is tuned on its own prior's validation distribution at the given dose.}\label{tab:lesion-poisson}
 \resizebox{\linewidth}{!}{%
 \begin{tabular}{llcccccccccccc}
@@ -873,7 +869,7 @@ Fashion $\to$ MNIST  & 0.75/0.5  & .88 & .66 & .48 & .31 & .000 & .003 & .78 & .
 \bottomrule
 \end{tabular}}
 \end{table}
- 
+
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth]{figures/step5_summary_lesions_I100.png}\\[2pt]
@@ -884,17 +880,9 @@ denoisers; error bars: s.d.\ over seeds.}\label{fig:lesion-poisson}
 
 
 \subsection{E14: Data, noise model and simulator}\label{sec:e14}
-The geometry fit, the noise-model checks and the dose thinning are described in Sections~\ref{sec:lodopab}--\ref{sec:sim3}. Figure~\ref{fig:geom} illustrates the geometry fit of Section~\ref{sec:lodopab} for one test slice. All hyperparameters are tuned on \emph{real} (thinned) observations of
-the validation slices, whereas every reported comparison is evaluated on \emph{simulated} crime-free data of the test slices. The simulator therefore has to be shown to be a faithful stand-in for the real data, and
-Table~\ref{tab:simcheck} does this for the baseline that is cheapest to run: it compares the TV PSNR obtained from the real (thinned) observations with that obtained from our crime-free simulation of the same slices.
-The agreement is within $0.15$\,dB at all nine conditions (first 8 test slices, one noise realisation each; mean difference $+0.03$\,dB, simulated minus real). For all 40 slices at $K=60$ the values are $31.91$ vs.\ $32.04$\,dB (full dose) and
-$29.82$ vs.\ $29.83$\,dB (quarter dose), and for FBP-Hann $30.65$ vs.\ $30.59$ and $28.73$ vs.\ $28.66$\,dB.
+The geometry fit, the noise-model checks and the dose thinning are described in Sections~\ref{sec:lodopab}--\ref{sec:sim3}; Figure~\ref{fig:geom} illustrates the geometry fit for one test slice. Hyperparameters are tuned on \emph{real} (thinned) observations of the validation slices, whereas every reported comparison is evaluated on data \emph{simulated} on a finer grid from the test slices. Table~\ref{tab:simcheck} therefore compares the TV PSNR obtained from the real (thinned) observations with that obtained from our simulation of the same slices. On the first 8 test slices the two agree within $0.15$\,dB in all nine conditions (one noise realisation each; mean difference $+0.03$\,dB, simulated minus real). On all 40 slices at $K=60$ the TV values are $31.91$ (real) and $32.04$\,dB (simulated) at full dose and $29.82$ and $29.83$\,dB at quarter dose; for FBP-Hann they are $30.65$ and $30.59$\,dB, and $28.73$ and $28.66$\,dB.
 
-The residual differences are small compared with the method differences studied below ($\le2.3$\,dB), but they are not zero and they are not random in sign across doses: the simulation is slightly \emph{easier} than the real data
-at full dose ($+0.07$ to $+0.15$\,dB at all three $K$), and indistinguishable or slightly harder at the two lower doses ($-0.05$ to $+0.05$\,dB). This is the direction expected if the real counts carry somewhat
-more variance than the simulation at high counts (dispersion index in Section~\ref{sec:sim3}), but it is a hypothesis: eight slices and a single noise draw do not allow a test, and we did not compute an interval for these differences.
-What the check does \emph{not} show is that the \emph{difference} between PnP and TV is the same on real and simulated data, only that the TV baseline is; we therefore state the PnP--TV comparisons for the simulated data and treat the
-simulator as validated for baseline accuracy, not for every method.
+The differences are small compared with the method differences studied below ($\le2.3$\,dB), but they are not zero and their sign depends on the method: the simulation is slightly \emph{easier} than the real data for TV at full dose ($+0.07$ to $+0.15$\,dB at the three $K$ on 8 slices; $+0.13$\,dB at $K=60$ on 40 slices) and slightly \emph{harder} for FBP-Hann ($-0.06$\,dB at $K=60$ on 40 slices). At the two lower doses the differences are within $\pm0.07$\,dB. A higher variance of the real counts at high count levels (dispersion index, Section~\ref{sec:sim3}) would make the real data harder for every method, which does not match the TV sign, so we do not interpret these differences. Eight slices and a single noise draw do not allow a test, and we computed no interval. The check does \emph{not} show that the \emph{difference} between PnP and TV is the same on real and simulated data; it covers the TV baseline (and FBP-Hann at $K=60$) only, so we state the PnP--TV comparisons for the simulated data.
 
 \begin{figure}[htbp]
 \centering
@@ -904,7 +892,7 @@ simulator as validated for baseline accuracy, not for every method.
 
 \begin{table}[htbp]
 \centering\small\setlength{\tabcolsep}{5pt}
-\caption{TV PSNR (dB) from real observations (thinned to the dose, subsampled to $K$ angles) and from the crime-free simulation of the same slices (first 8 test slices).}\label{tab:simcheck}
+\caption{TV PSNR (dB) from real observations (thinned to the dose, subsampled to $K$ angles) and from the finer-grid simulation of the same slices (first 8 test slices).}\label{tab:simcheck}
 \begin{tabular}{llccccccccc}
 \toprule
 $K$ & & \multicolumn{3}{c}{30} & \multicolumn{3}{c}{60} & \multicolumn{3}{c}{120}\\
@@ -916,10 +904,11 @@ simulated & & 29.41 & 27.90 & 26.52 & 30.27 & 28.45 & 26.72 & 30.76 & 28.55 & 27
 \bottomrule
 \end{tabular}
 \end{table}
- 
+
 \begin{table}[htbp]
 \centering\small\setlength{\tabcolsep}{4pt}
-\caption{Tuned parameters (20 validation slices per condition): Hann cut-off, TV weight (the TV-long weight was the same in every condition), and $(\sigma_d,k)$ of PnP-const and PnP-TVinit.}\label{tab:params3}
+\caption{Tuned parameters (20 validation slices per condition): Hann cut-off, TV weight, and $(\sigma_d,k)$ of PnP-const and PnP-TVinit.
+}\label{tab:params3}
 \begin{tabular}{llcccc}
 \toprule
 $K$ & dose & Hann & TV $\lambda$ & PnP-const $(\sigma_d,k)$ & PnP-TVinit $(\sigma_d,k)$\\
@@ -932,31 +921,30 @@ $K$ & dose & Hann & TV $\lambda$ & PnP-const $(\sigma_d,k)$ & PnP-TVinit $(\sigm
 60  & 0.1  & 0.12 & 0.03  & (0.05, 12) & (0.02, 12)\\
 120 & 1    & 0.4  & 0.003 & (0.05, 2)  & (0.0039, 8)$^\dagger$\\
 120 & 0.25 & 0.2  & 0.01  & (0.02, 12) & (0.0062, 8)\\
-120 & 0.1  & 0.16 & 0.01  & (0.05, 8)  & (0.128, 1)$^\dagger$\\
+120 & 0.1  & 0.16 & 0.01  & (0.05, 8)  & (0.128, 1)$^{\dagger,\ddagger}$\\
 \bottomrule
 \end{tabular}\\[2pt]
-{\footnotesize $^\dagger$ optimum on the boundary of the grid after the automatic extensions.}
+{\footnotesize $^\dagger$ optimum on the boundary of the grid after the automatic extensions. $^\ddagger$ $\sigma_d$ above the training range $(0,0.1)$ of the denoiser.}
 \end{table}
 
 
 \subsection{E15: Learned prior versus TV on real slices at $K=60$}\label{sec:e15}
-Table~\ref{tab:e15} compares PnP variants with TV on the 40 test slices at $K=60$ (one slice per patient; data simulated crime-free, Section~\ref{sec:sim3}); all methods are tuned on the same 20 validation slices.
-TV is the box-constrained primal--dual solver of Section~\ref{sec:methods3}, so the comparison is already against the stronger TV of E2b. Besides PnP-const and PnP-TVinit (Section~\ref{sec:methods3}), the table contains
+Table~\ref{tab:e15} compares PnP variants with TV on the 40 test slices at $K=60$ (one slice per patient; data simulated on a finer grid, Section~\ref{sec:sim3}); all methods are tuned on the same 20 validation slices.
+TV is the box-constrained primal--dual solver of Section~\ref{sec:methods3} (150 iterations), so the comparison is already against the stronger TV of E2b. Besides PnP-const and PnP-TVinit (Section~\ref{sec:methods3}), the table contains
 two variants introduced to test whether the PnP set-up, not the prior, is the weak point: \emph{PnP-anneal}, in which $\sigma_d$ decreases geometrically from $\sigma_0\in\{0.05,0.1\}$ to $\sigma_1\in\{0.01,0.03\}$ over $T\in\{20,40\}$ iterations (FBP-Hann start), and \emph{TV+denoise}, a single denoiser pass
 on the TV image with tuned $\sigma$. Each variant is run with the 8-layer denoiser (d8) and with a deeper one (d17, 17 layers, trained for 20\,000 steps).
 
-With the re-tuned starting image, PnP-const is slightly but significantly below TV ($-0.17$ and $-0.10$\,dB at full and quarter dose) and PnP-TVinit is at TV level
+PnP-const is slightly but significantly below TV ($-0.17$ and $-0.10$\,dB at full and quarter dose) and PnP-TVinit is at TV level
 at full dose ($+0.03$\,dB, interval $[-0.00,+0.06]$) and $+0.21$\,dB above it at quarter dose. The deeper denoiser does not help (PnP-const $-0.30$ and $-0.25$\,dB). Annealing $\sigma_d$ is worse than constant $\sigma_d$ at full dose ($-0.65$\,dB versus TV) and better at quarter dose ($+0.12$\,dB, but not for the deeper denoiser: $+0.05$, interval including zero).
-One denoiser pass on the TV image gives TV (within $\pm0.05$\,dB with the d8 network, and $\pm0.02$\,dB with d17). SSIM does not show the quarter-dose gain: PnP-TVinit [d8] is $0.003$ above TV at quarter dose and $0.002$ below it at full dose, and PnP-const is $0.013$ and $0.016$ below TV.
+One denoiser pass on the TV image gives TV (within $\pm0.05$\,dB with d8 and $\pm0.02$\,dB with d17). SSIM does not show the quarter-dose gain: PnP-TVinit [d8] is $0.003$ above TV at quarter dose and $0.002$ below it at full dose, and PnP-const is below TV by $0.013$ (full dose) and $0.016$ (quarter dose).
 
 \emph{How far to trust the best variant.} The gain of PnP-TVinit at quarter dose is the largest positive entry of the table, but three cautions apply. (i)~PnP-TVinit and the other variants were introduced \emph{after} the first PnP-const result was below TV (Section~\ref{sec:history3}), so the best of several variants is
-selected in part on the test slices and its $+0.21$\,dB is optimistic; no multiplicity correction is applied to the 16 intervals of the table. (ii)~PnP-TVinit performs more iterations than TV, whereas TV has only the 150 of the tuned solver; the control for that is TV-long in E16, where TV-long is itself above TV
-at $K=60$ ($32.12$ and $29.88$\,dB in Table~\ref{tab:grid3}, against $31.91$ and $29.82$\,dB for TV here, on different noise draws), so the margin of PnP-TVinit over a TV given the same number of iterations is smaller than the one reported here and is studied in E16. (iii)~$0.2$\,dB is a small difference, and the paired intervals reflect sampling over 40 patients with one noise realisation each, not variation over denoiser training runs.
-In short, on clinical-size slices and at $K=60$ the learned prior is at best competitive with TV in PSNR rather than $\approx4$\,dB better as in the $28\times28$ experiments. This is not a like-for-like contrast: image size, data, noise model and the match between prior and test data all differ, and we do not claim to have isolated the reason.
+selected in part on the test slices and its $+0.21$\,dB is optimistic; no multiplicity correction is applied to the 16 intervals of the table. (ii)~PnP-TVinit performs more iterations than TV (150 TV iterations plus $k$ PnP iterations); the control is TV-long (E16), which is itself above TV at $K=60$ in the same noise draws ($+0.08$ and $+0.05$\,dB, Table~\ref{tab:grid3}), so the margin of PnP-TVinit over TV-long is smaller than over TV ($-0.03$ and $+0.16$\,dB, Table~\ref{tab:acc3}). (iii)~$0.2$\,dB is a small difference, and the paired intervals reflect sampling over 40 patients with one noise realisation each, not variation over denoiser training runs.
+In short, on clinical-size slices at $K=60$ the learned prior is at best competitive with TV in PSNR rather than $\approx4$\,dB better as in the $28\times28$ experiments. This is not a like-for-like contrast: image size, data, noise model and the match between prior and test data all differ, and we do not claim to have isolated the reason.
 
 \begin{table}[htbp]
 \centering\small\setlength{\tabcolsep}{4pt}
-\caption{$K=60$, 40 test slices: PSNR (dB) and SSIM, and the paired PSNR difference to TV (mean, 95\% bootstrap interval over patients; * excludes 0). d8: 8-layer denoiser; d17: 17-layer denoiser.}\label{tab:e15}
+\caption{$K=60$, 40 test slices: PSNR (dB) and SSIM, and the paired PSNR difference to TV (mean, 95\% bootstrap interval over patients; $^*$ excludes 0). d8: 8-layer denoiser; d17: 17-layer denoiser.}\label{tab:e15}
 \resizebox{\linewidth}{!}{%
 \begin{tabular}{lcccccc}
 \toprule
@@ -980,26 +968,28 @@ TV+denoise [d17]    & 31.90 & 0.786 & ${-}0.02$ {\scriptsize$[{-}0.05,+0.02]$} &
 
 
 \subsection{E16: Accuracy over the dose $\times$ angle grid}\label{sec:e16}
-Table~\ref{tab:grid3} gives the mean PSNR and SSIM of the five methods in the nine conditions of the lesion-free arm of the lesion experiment (same 40 slices in every condition, one noise realisation per condition), and Table~\ref{tab:acc3} the paired differences. The top row of Figure~\ref{fig:grid3} (shown with E17) displays the PSNR and SSIM differences of Table~\ref{tab:acc3} as heat maps over the dose $\times$ angle grid. TV-long, the TV with twice the iterations and its own tuned weight, is the primary classical comparator, because it receives the same
-number of iterations as the PnP methods. No correction for multiplicity is applied to the $36$ intervals of Table~\ref{tab:acc3}, and since the conditions share the same slices they are not independent.
+Table~\ref{tab:grid3} gives the mean PSNR and SSIM of the five methods in the nine conditions of the lesion-free arm of the lesion experiment (same 40 slices in every condition, one noise realisation per condition), and Table~\ref{tab:acc3} the paired differences. The top row of Figure~\ref{fig:grid3} (shown with E17) displays the PSNR and SSIM differences of Table~\ref{tab:acc3} as heat maps over the dose $\times$ angle grid.
+TV-long (300 instead of 150 iterations, with a tuned weight) is the classical comparator we emphasise, because it has more iterations than TV and thus controls for the iteration count in which PnP differs from TV. It is not matched to PnP in cost or in tuned degrees of freedom (PnP-const uses at most 12 iterations, PnP-TVinit at most $150+12$; Table~\ref{tab:params3}), and it was introduced after the first lesion results (Section~\ref{sec:history3}). No correction for multiplicity is applied to the $36$ intervals of Table~\ref{tab:acc3}, and since the conditions share the same slices they are not independent.
 
-\emph{What holds in all nine conditions.} PnP-const and TV-long beat FBP-Hann in PSNR (PnP-const by $0.92$--$1.36$\,dB, TV-long by $0.81$--$2.28$\,dB) and in SSIM, with all intervals excluding zero.
+\emph{What holds in all nine conditions.} PnP-const and TV-long beat FBP-Hann in PSNR (PnP-const by $0.92$--$1.36$\,dB, TV-long by $0.81$--$2.28$\,dB) and in SSIM.
 
 \emph{PnP-const against TV-long.} PnP-const is \emph{not} better than TV-long on average: its PSNR difference lies between $-0.93$ and $+0.33$\,dB (mean over the nine conditions $-0.13$\,dB), significantly positive in three conditions ($K=30$ and $60$ at dose 0.1, and $K=120$ at full dose), significantly negative in four ($K=30$, $60$ at full dose; $K=60$ at quarter dose; $K=120$ at dose 0.1) and not significant in two.
 Its SSIM is below TV-long's in eight of nine conditions, significantly so in seven, and above it in one ($+0.001$, not significant). The sign does not follow dose or angle count monotonically: the low-dose, few-view advantage at $K=30$ and $60$ is reversed at $K=120$, dose 0.1. We therefore do not summarise the grid as a trend.
 
 \emph{PnP-TVinit.} PnP-TVinit has the highest mean PSNR in seven of nine conditions, by at most $0.49$\,dB over TV-long
-(significantly higher in five, lower in two: $K=30$, full dose, $-0.15$\,dB, and $K=60$, full dose, $-0.03$\,dB), but the highest mean SSIM in only five. Two of its cells are not denoiser effects (Section~\ref{sec:methods3}): at $K=120$, full dose, the tuned $\sigma_d=0.0039$ means almost no denoising, so
-the $+0.41$\,dB over TV-long (and $+0.28$\,dB over TV) there comes from the additional data-consistency iterations started at the TV solution, not from the learned prior; at $K=120$, dose 0.1, the tuned $k=1$ is a single step. The largest margin, $+0.49$\,dB at $K=60$, dose 0.1, is in a cell with interior optimum.
+(significantly higher in five, lower in two: $K=30$, full dose, $-0.15$\,dB, and $K=60$, full dose, $-0.03$\,dB), but the highest (or tied-highest) mean SSIM in only five. Some of its cells are not denoiser effects (Section~\ref{sec:methods3}): at $K=120$, full dose, the tuned $\sigma_d=0.0039$ means almost no denoising, so
+the $+0.41$\,dB over TV-long (and $+0.28$\,dB over TV) comes from the additional data-consistency iterations started at the TV solution, not from the learned prior; at $K=120$, dose 0.1, the tuned $k=1$ is a single step with $\sigma_d$ above the denoiser's training range; and at $K=120$, quarter dose, $\sigma_d=0.0062$ is similarly small ($+0.35$\,dB over TV-long).
+The largest margin, $+0.49$\,dB at $K=60$, dose 0.1, is in a cell with interior optimum.
 
-\emph{Scale of the differences.} TV is the same method on the same slices in the $K=60$ cells here and in E15, yet its mean PSNR differs by $0.13$\,dB at full dose ($32.04$ versus $31.91$\,dB) and $0.01$\,dB at quarter dose because the noise draws differ, while PnP-const $-$ TV changes by only $0.02$\,dB at full dose ($-0.19$ versus $-0.17$\,dB). Differences between methods are thus more stable than absolute levels, but margins of a few tenths of a dB are within what a different noise
-realisation can move, and we do not rank methods on differences below that. TV-long is slightly worse than TV at $K=120$, full dose ($32.50$ vs.\ $32.64$\,dB), which shows that the early-stopped 150-iteration TV is itself a tuned object and that the weight grid is coarse.
+\emph{Scale of the differences.} TV is the same method on the same slices in the $K=60$ cells here and in E15, yet its mean PSNR differs by $0.13$\,dB at full dose ($32.04$ versus $31.91$\,dB) and $0.01$\,dB at quarter dose, while PnP-const $-$ TV changes by only $0.02$\,dB at full dose ($-0.19$ versus $-0.17$\,dB). Differences between methods are thus more stable than absolute levels, but margins of a few tenths of a dB are within what a different noise
+realisation can move, and we do not rank methods on differences below that.
+TV-long is slightly worse than TV at $K=120$, full dose ($32.50$ vs.\ $32.64$\,dB), which suggests that the 150-iteration TV is itself a tuned object and that the weight grid is coarse.
 
-\emph{Relation to detection.} The ranking by PSNR is not the ranking by lesion detectability (E17): TV-long is $0.81$--$2.28$\,dB better than FBP-Hann in PSNR but has a lower paired AUC in all nine conditions, so the accuracy results of this subsection should not be read as evidence about diagnostic usefulness.
+The ranking by PSNR is not the ranking by lesion detectability (E17): TV-long is $0.81$--$2.28$\,dB better than FBP-Hann in PSNR but has a lower paired AUC in all nine conditions, so the accuracy results of this subsection should not be read as evidence about diagnostic usefulness.
 
 \begin{table}[htbp]
 \centering\small\setlength{\tabcolsep}{3pt}
-\caption{Mean PSNR (dB, upper block) and SSIM (lower block) of the lesion-free reconstructions, 40 patients (best in each condition in bold). Columns: $K$ angles / dose.}\label{tab:grid3}
+\caption{Mean PSNR (dB, upper block) and SSIM (lower block) of the lesion-free reconstructions, 40 patients (best in each condition in bold; ties in bold). Columns: $K$ angles / dose.}\label{tab:grid3}
 \resizebox{\linewidth}{!}{%
 \begin{tabular}{lccccccccc}
 \toprule
@@ -1017,13 +1007,13 @@ PnP-TVinit & 31.15 & \textbf{29.22} & \textbf{27.96} & 32.09 & \textbf{30.04} & 
 \multicolumn{10}{l}{SSIM}\\
 FBP-Hann & 0.692 & 0.666 & 0.655 & 0.738 & 0.699 & 0.680 & 0.763 & 0.725 & 0.693 \\
 TV & 0.765 & 0.733 & 0.710 & 0.788 & 0.750 & 0.717 & 0.799 & 0.756 & 0.741 \\
-TV-long & \textbf{0.773} & \textbf{0.737} & 0.713 & \textbf{0.790} & 0.753 & 0.720 & 0.797 & 0.758 & \textbf{0.745} \\
+TV-long & \textbf{0.773} & \textbf{0.737} & 0.713 & \textbf{0.790} & \textbf{0.753} & 0.720 & 0.797 & 0.758 & \textbf{0.745} \\
 PnP-const & 0.745 & 0.726 & 0.707 & 0.775 & 0.733 & 0.721 & 0.793 & 0.749 & 0.731 \\
 PnP-TVinit & 0.767 & 0.730 & \textbf{0.721} & 0.786 & \textbf{0.753} & \textbf{0.731} & \textbf{0.805} & \textbf{0.761} & 0.740 \\
 \bottomrule
 \end{tabular}}
 \end{table}
- 
+
 \begin{table}[htbp]
 \centering\small\setlength{\tabcolsep}{3pt}
 \caption{Paired differences over patients (mean, 95\% bootstrap interval; $^*$ excludes 0), 40 patients.}\label{tab:acc3}
@@ -1048,10 +1038,10 @@ $K$ & dose & PSNR: PnP-const $-$ TV-long & SSIM: PnP-const $-$ TV-long & PSNR: P
 
 \subsection{E17: Lesion detection}\label{sec:e17}
 \emph{Grid (Table~\ref{tab:det3}, Figure~\ref{fig:grid3}).} Pooled over the two lesion sizes (contrast $0.06$; up to 160 lesions per size), PnP-const has a higher paired AUC than TV-long in all nine conditions, by $0.03$ to $0.16$, with intervals excluding zero in six (all three $K=120$ conditions, $K=60$ at doses $0.25$ and $0.1$, $K=30$ at dose $0.1$); it is not significant at full dose for $K=30$ and $60$.
-Against FBP-Hann, however, PnP-const is never significantly better (three positive, six negative or zero differences) and is significantly worse in two conditions ($K=30$, full dose, $-0.075$; $K=120$, quarter dose, $-0.059$): the learned prior removes the detection deficit of TV rather than adding to FBP's detectability.
+Against FBP-Hann, however, PnP-const is never significantly better (three positive, six negative or zero differences) and is significantly worse in two conditions ($K=30$, full dose, $-0.075$; $K=120$, quarter dose, $-0.059$): the learned prior is about level with FBP-Hann and thus avoids the detection deficit of PSNR-tuned TV, but does not add to FBP's detectability.
 TV-long, tuned for PSNR, has a lower AUC than FBP-Hann in all nine conditions (significantly in seven, down to $-0.20$ at $K=60$, dose $0.1$) while being $0.81$--$2.28$\,dB better in PSNR: PSNR and detectability rank the methods in opposite orders. PnP-TVinit exceeds TV-long in AUC in all nine conditions (significantly in seven; $+0.02$ to $+0.17$).
-The choice of comparator matters: against the 150-iteration TV the advantage of PnP-const is $0.000$ and $+0.006$ at full dose for $K=60$ and $30$, because TV-long, with its extra iterations, has the lower AUC of the two TV variants (at $K=60$, full dose, by $0.05$). The conclusion ``PnP beats TV in detection'' is
-therefore specific to a PSNR-tuned TV with the iteration budget of PnP; we did not tune TV, nor PnP, for detection on real slices (in the Gaussian experiments of E10 the detection-tuned TV changed very little, but that does not transfer automatically).
+The choice of comparator matters: against the 150-iteration TV the advantage of PnP-const is $0.000$ and $+0.006$ at full dose for $K=60$ and $30$, because at those conditions TV-long has a lower AUC than TV (at $K=60$, full dose, by $0.05$). The conclusion ``PnP beats TV in detection'' is
+therefore specific to a PSNR-tuned TV with the iteration count of TV-long; we did not tune TV, nor PnP, for detection on real slices (in the Gaussian experiments of E10 the detection-tuned TV changed very little, but that does not transfer automatically).
 
 \emph{Retention.} At $K=60$ and full dose the regularised methods retain only $7$--$32\%$ of the local-contrast difference of the inserted lesion (FBP-Hann $31$--$67\%$); the detection scores of TV and PnP are therefore obtained mainly from noise suppression, not from preserving lesion contrast.
 
@@ -1060,14 +1050,14 @@ At $\sigma_l=4$\,px and $c=0.06$ all methods reach AUC $0.95$--$0.96$ at full do
 
 \emph{Contrast with the $28\times28$ experiments.} In E9 the learned prior had a \emph{lower} paired AUC than TV in distribution ($-0.04$ to $-0.23$), at a PSNR advantage of about $4$\,dB. On real slices the sign is reversed: PnP-const is above TV-long in all nine conditions and above TV in eight of nine (significantly in seven),
 at a PSNR that differs from TV-long's by between $-0.9$ and $+0.3$\,dB. We did not test why. Candidate explanations that this study cannot separate are the lesion scale relative to the pixel grid ($\sigma_l=2$--$4$\,px here against $0.5$--$2$\,px), the noise texture of real slices against the digit backgrounds, and the different amount of smoothing that the
-PSNR-tuned operating points produce; the observer, which sums a disc against an annulus, rewards any method that suppresses background fluctuations at the lesion scale. The result should be read as a property of this prior, observer and lesion type, not as a general ranking of learned and classical regularisers.
+PSNR-tuned operating points produce; the observer, which sums a disc against an annulus, rewards any method that suppresses background fluctuations at the lesion scale. The result is a property of this prior, observer and lesion type, not a general ranking of learned and classical regularisers.
 
 \emph{Scope.} The lesions have a contrast of $0.06$ on the $\mu/\mu_{\max}$ scale, which is high compared with clinically low-contrast lesions (Section~\ref{sec:observer3}), the observer knows the lesion location, there is one noise realisation per condition and 40 patients, and the AUC of a single cell has a precision of about $\pm0.05$. A detection advantage says nothing about false structures; these are the subject of E18.
 
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\linewidth]{figures/step5_grid.png}
-\caption{Paired differences over the nine dose $\times$ angle conditions (cell: mean, 95\% interval over 40 patients; $^*$ excludes 0; blue: the first method is higher). Top row: PSNR (PnP-const and PnP-TVinit against TV-long) and SSIM (E16); bottom row: paired AUC of PnP-const against TV-long and against FBP-Hann (E17), and the difference in false blobs per slice at one times the nominal lesion strength (E18). Produced by \texttt{run\_stage3\_step5\_summary.py}.}\label{fig:grid3}
+\caption{Paired differences over the nine dose $\times$ angle conditions (cell: mean, 95\% interval over 40 patients; $^*$ excludes 0; blue: the first method is higher). Top row: PSNR (PnP-const and PnP-TVinit against TV-long) and SSIM (E16); bottom row: paired AUC of PnP-const against TV-long and against FBP-Hann (E17), and the difference in false blobs per slice at $\gamma=1$ (E18).}\label{fig:grid3}
 \end{figure}
 
 \begin{table}[htbp]
@@ -1093,21 +1083,21 @@ $K$ & dose & PnP-const $-$ TV-long & PnP-const $-$ TV & PnP-const $-$ FBP-Hann &
 
 
 \subsection{E18: False structures on real slices}\label{sec:e18}
-Table~\ref{tab:absfb3} (CT rows) gives the mean number of false blobs per lesion-free slice at one times the nominal lesion strength for the four conditions that are also used in the shift study. A false blob is defined in Section~\ref{sec:observer3}; because the ground truth of LoDoPaB-CT is itself a reconstruction, ``false'' means unsupported by this reference and not absent from the patient.
-On real slices PnP-const makes $0.24$--$1.38$ such blobs per slice and TV-long $0.00$--$6.06$ (FBP-Hann $5.8$--$26.8$), so the regularised methods make far fewer than FBP-Hann, but the counts of TV-long are not small in every condition.
-Over the nine conditions the paired difference PnP-const $-$ TV-long at $m=1$ (Table~\ref{tab:fb3}) is significantly positive in three ($K=60$ full dose: $+0.46$; $K=120$ full and quarter dose: $+0.24$, $+1.35$), significantly negative in three ($K=30$ quarter dose: $-5.31$; $K=60$ quarter dose: $-0.40$; $K=120$ dose 0.1: $-0.93$) and not significant in three, with no consistent pattern in dose or angle count: at $K=120$ the sign changes from positive to negative as the dose decreases, at $K=30$ it is negative in two of three conditions.
-At $m=1.5$ the excess of PnP-const over TV-long is at most $0.45$ blobs per slice ($K=120$, quarter dose). In the $K=60$ experiment (E17b, threshold $m=0.5$) PnP-const has fewer false blobs than TV at both doses ($-1.7$ at full dose, $-6.6$ at quarter dose). Counts are not comparable with E9: there the lesion-free images are digits on an empty background and the learned prior produced essentially none in distribution, whereas here the background is real anatomy, which contains many structures of lesion size.
+Table~\ref{tab:absfb3} (CT rows) gives the mean number of false blobs per lesion-free slice at $\gamma=1$ (a response of at least one nominal lesion) for the four conditions that are also used in the shift study. A false blob is defined in Section~\ref{sec:observer3}; because the ground truth of LoDoPaB-CT is itself a reconstruction, ``false'' means unsupported by this reference and not absent from the patient.
+In these four conditions PnP-const makes $0.24$--$1.38$ such blobs per slice and TV-long $0.00$--$6.06$ (FBP-Hann $5.8$--$26.8$), so the regularised methods make far fewer than FBP-Hann, but the counts of TV-long are not small in every condition.
+Over the nine conditions the paired difference PnP-const $-$ TV-long at $\gamma=1$ (Table~\ref{tab:fb3}) is significantly positive in three ($K=60$ full dose: $+0.46$; $K=120$ full and quarter dose: $+0.24$, $+1.35$), significantly negative in three ($K=30$ quarter dose: $-5.31$; $K=60$ quarter dose: $-0.40$; $K=120$ dose 0.1: $-0.93$) and not significant in three, with no consistent pattern in dose or angle count: at $K=120$ the sign changes from positive to negative as the dose decreases, at $K=30$ it is negative in two of three conditions.
+At $\gamma=1.5$ the excess of PnP-const over TV-long is at most $0.45$ blobs per slice ($K=120$, quarter dose). In the $K=60$ experiment (E17b, $\gamma=0.5$) PnP-const has fewer false blobs than TV at both doses ($-1.7$ at full dose, $-6.6$ at quarter dose). Counts are not comparable with E9: there the lesion-free images are digits on an empty background and the learned prior produced essentially none in distribution, whereas here the background is real anatomy, which contains many structures of lesion size.
 
-The galleries of the strongest unsupported blob per slice (Figures~\ref{fig:gal1} and~\ref{fig:gal025}) show that the largest false blobs occur at the same location in FBP-Hann and in TV as well as in PnP (for example the slices 28 and 9 at full dose and most rows at quarter dose), so they are produced by the data (few views, noise, streaks), not by the prior. Only a few look specific to the prior: a crescent in slice 18 at full dose
+The galleries of the strongest unsupported blob per slice (Figures~\ref{fig:gal1} and~\ref{fig:gal025}) show that the largest false blobs occur at the same location in FBP-Hann and in TV as well as in PnP (for example the slices 28 and 9 at full dose and most rows at quarter dose), so they appear to be driven by the data (few views, noise, streaks) and not by the prior. Only a few look specific to the prior: a crescent in slice 18 at full dose
 (PnP-const only) and streaks in the PnP-TVinit image of slice 32 at quarter dose. We therefore find \emph{no evidence that the prior creates many lesion-like structures in distribution}, but we cannot exclude rare ones: 40 slices and one noise draw per condition do not bound a rare event, and the galleries show the worst cases selected by the methods' own responses, not a random sample.
 
 \begin{table}[htbp]
 \centering\small\setlength{\tabcolsep}{3pt}
-\caption{Paired differences in false blobs per lesion-free slice on real CT slices (40 patients; mean, 95\% interval; $^*$ excludes 0), pooled over $\sigma_l\in\{2,4\}$; $m$: threshold in units of the nominal lesion response.}\label{tab:fb3}
+\caption{Paired differences in false blobs per lesion-free slice on real CT slices (40 patients; mean, 95\% interval; $^*$ excludes 0), pooled over $\sigma_l\in\{2,4\}$; $\gamma$: threshold in units of the nominal lesion response.}\label{tab:fb3}
 \resizebox{\linewidth}{!}{%
 \begin{tabular}{llccc}
 \toprule
-$K$ & dose & $m=1$: PnP-const $-$ TV-long & $m=1$: PnP-const $-$ TV & $m=1.5$: PnP-const $-$ TV-long\\
+$K$ & dose & $\gamma=1$: PnP-const $-$ TV-long & $\gamma=1$: PnP-const $-$ TV & $\gamma=1.5$: PnP-const $-$ TV-long\\
 \midrule
 30 & 1 & ${-}1.19$ {\scriptsize$[{-}2.79,+0.05]$} & ${-}0.54$ {\scriptsize$[{-}1.57,+0.36]$} & ${-}0.23$ {\scriptsize$[{-}0.64,+0.11]$} \\
 30 & 0.25 & ${-}5.31^{*}$ {\scriptsize$[{-}9.15,{-}2.31]$} & ${-}4.81^{*}$ {\scriptsize$[{-}8.41,{-}2.00]$} & ${-}2.42^{*}$ {\scriptsize$[{-}4.56,{-}0.82]$} \\
@@ -1136,30 +1126,31 @@ $K$ & dose & $m=1$: PnP-const $-$ TV-long & $m=1$: PnP-const $-$ TV & $m=1.5$: P
 
 
 \subsection{E19: Distribution shift to non-anatomical phantoms}\label{sec:e19}
-The CT-trained prior and all tuned parameters are applied, without retuning, to 20 random piecewise-constant phantoms (ellipses, rectangles and a stripe or checker block on a faint disc, $\mu/\mu_{\max}$ scale; nothing like a CT slice, but the kind of image TV favours; same phantoms in every condition; this is a deliberately TV-friendly shift, so it tests how much of the learned prior's behaviour survives, not how it fares under realistic shifts such as another scanner or anatomy) with the same lesion protocol. The shift was first run at $K=60$ (doses 1 and 0.25) and
+The CT-trained prior and all tuned parameters are applied, without retuning, to 20 random piecewise-constant phantoms (ellipses, rectangles and a stripe or checker block on a faint disc, $\mu/\mu_{\max}$ scale; nothing like a CT slice, but the kind of image TV favours; same phantoms in every condition). This is a deliberately TV-friendly shift, so it tests how much of the learned prior's behaviour survives, not how it fares under realistic shifts such as another scanner or anatomy. The same lesion protocol is used. The shift was first run at $K=60$ (doses 1 and 0.25) and
 then extended to $K=30$ and $120$; the $K=60$ analysis used four lesion types, the others two, so the designs differ slightly.
- 
-\emph{Accuracy and detection (Table~\ref{tab:shift3a}).} On the phantoms PnP-const is below TV-long in PSNR in all six conditions ($-0.11$ to $-0.75$\,dB; significantly in five of the six conditions, the exception being $K=30$, full dose) and in SSIM in all four ($-0.095$ to $-0.190$, all significant, against $-0.004$ to $-0.027$ on CT).
-At quarter dose its SSIM is also below FBP-Hann's on the phantoms ($-0.045$ at $K=30$ and $-0.041$ at $K=120$, both significant). The detection advantage over TV-long is significant in one of six shift conditions ($K=120$, full dose: $+0.075$, $[+0.013,+0.137]$), against three of the six corresponding CT conditions ($K=60$ quarter dose, $K=120$ at both doses);
-the shift effect is significantly negative only at $K=120$, quarter dose ($-0.175$, $[-0.297,-0.056]$). The CT advantage is therefore not reliably transferred to the shifted images, but at 20 phantoms the interval widths of $0.12$--$0.19$ do not allow us to say that it is lost either.
-In PSNR the shift costs at most about $0.75$\,dB against TV-long, much less than the $3$--$4$\,dB reversals of the $28\times28$ experiments (E4, E8); in SSIM the deficit is large ($-0.095$ to $-0.190$).
- 
-\emph{False blobs (Tables~\ref{tab:shift3a}--\ref{tab:absfb3}).} The sign of PnP-const $-$ TV at $1\times$ lesion strength follows the number of angles: negative (or not different from zero) at $K=30$ and negative at full-dose $K=60$, mixed at $K=60$ quarter dose ($\sigma_l=2$: $-7.5$; $\sigma_l=4$: $+9.1$), and positive at $K=120$ ($+9.0$ to $+13.0$ per phantom at both doses; at $1.5\times$ against TV-long $+10.2$ at full dose and $+3.8$ at quarter dose, both significant).
+
+\emph{Accuracy and detection (Table~\ref{tab:shift3a}).} On the phantoms PnP-const is below TV-long in PSNR in all six conditions ($-0.11$ to $-0.75$\,dB; significantly in five of the six, the exception being $K=30$, full dose) and in SSIM in all four conditions where it was stored ($-0.095$ to $-0.190$, all significant, against $-0.004$ to $-0.027$ in the corresponding CT conditions).
+At quarter dose its SSIM is also below FBP-Hann's on the phantoms ($-0.045$ at $K=30$ and $-0.041$ at $K=120$, both significant).
+The detection advantage over TV-long is significant in one of six shift conditions ($K=120$, full dose: $+0.075$, $[+0.013,+0.137]$), against three of the six corresponding CT conditions ($K=60$ quarter dose, $K=120$ at both doses);
+the shift effect (phantom minus CT) is significantly negative only at $K=120$, quarter dose ($-0.175$, $[-0.297,-0.056]$). The CT advantage is therefore not reliably transferred to the shifted images, but with 20 phantoms the interval widths of $0.08$--$0.19$ do not allow us to say that it is lost either.
+In PSNR the deficit against TV-long on the phantoms is at most $0.75$\,dB, much smaller than the $3$--$4$\,dB reversals of the $28\times28$ experiments (E4, E8); relative to CT it is larger in some conditions and smaller in others (for example $-0.11$\,dB on phantoms against $-0.93$\,dB on CT at $K=30$, full dose; $-0.75$ against $-0.20$\,dB at $K=60$, quarter dose). In SSIM the deficit is large ($-0.095$ to $-0.190$).
+
+\emph{False blobs (Tables~\ref{tab:shift3a}--\ref{tab:absfb3}).} The sign of PnP-const $-$ TV at $\gamma=1$ follows the number of angles: negative at $K=30$ (not significant for $\sigma_l=4$ at quarter dose) and at full-dose $K=60$, mixed at $K=60$ quarter dose ($\sigma_l=2$: $-7.5$; $\sigma_l=4$: $+9.1$), and positive at $K=120$ ($+9.0$ to $+13.0$ per phantom at both doses; at $\gamma=1.5$ against TV-long $+10.2$ at full dose and $+3.8$ at quarter dose, both significant).
 The absolute counts show why (Table~\ref{tab:absfb3}): the count of TV-long varies from $3.2$ to $83.9$ per phantom over the four conditions, that of PnP-const only from $12.8$ to $50.3$; at $K=30$ TV-long makes two to three times as many false blobs as FBP-Hann ($30.2$ vs.\ $15.5$ at quarter dose, $83.9$ vs.\ $31.6$ at full dose), at $K=120$ about a third or less ($3.2$ vs.\ $8.7$, i.e.\ $37\%$; $32.1$ vs.\ $118.7$, i.e.\ $27\%$).
-So the ``excess'' of PnP-const at $K=120$ is relative to a TV that is unusually clean there. Relative to \emph{FBP-Hann} the picture is more informative: at full dose PnP-const has fewer false blobs on the phantoms ($-7.1$ at $K=30$, $-68.4$ at $K=120$, both significant), but at quarter dose it has more at both $K$ ($+1.0$, not significant, and $+4.0$ [$+2.4,+5.9$] at $1\times$;
-$+2.2$ [$+1.1,+3.4$] and $+2.7$ [$+1.4,+4.4$] at $1.5\times$), in contrast to real slices, where it has significantly fewer than FBP-Hann in both quarter-dose conditions ($-9.0$ and $-4.4$). In this sense the shift turns the prior from suppressing to adding false blobs relative to the unregularised reconstruction at quarter dose, by a few blobs per phantom, although this is significant only at $K=120$. The pooled counts hide a dependence on lesion size: at $1\times$, for $\sigma_l=2$ PnP-const has more false blobs than FBP-Hann on the phantoms in three of the four conditions ($+10.1$, $+9.7$ and $+10.6$ at $K=30$ full and quarter dose and $K=120$ quarter dose, all significant), for $\sigma_l=4$ fewer in all four ($-24.3$, $-7.7$, $-30.9$, $-2.5$).
-At $K=120$, full dose, PnP-TVinit with almost no denoising ($\sigma_d=0.0039$) also produces $14.0$ more blobs than TV-long ($[+7.4,+22.0]$ at $1\times$, for all $\sigma_l$), so at least part of the excess at $K=120$ is not due to the denoiser; we did not isolate the cause.
-In the gallery of the strongest unsupported blob per phantom (Figure~\ref{fig:galshape}, $K=60$, quarter dose) the worst blobs again occur at the same location in FBP-Hann, TV and PnP, mostly in uniform regions of the phantom, with TV reaching up to $4.9$ times the nominal lesion response and the four worst PnP-const blobs between about $2.8$ and $3.2$ times; in these examples the prior does not create blobs that the data do not already suggest.
- 
+So the ``excess'' of PnP-const at $K=120$ is relative to a TV that is unusually clean there. Relative to \emph{FBP-Hann} the picture is more informative: at full dose PnP-const has fewer false blobs on the phantoms ($-7.1$ at $K=30$, $-68.4$ at $K=120$, both significant), but at quarter dose it has more at both $K$ ($+1.0$, not significant, and $+4.0$ [$+2.4,+5.9$] at $\gamma=1$;
+$+2.2$ [$+1.1,+3.4$] and $+2.7$ [$+1.4,+4.4$] at $\gamma=1.5$), in contrast to real slices, where it has significantly fewer than FBP-Hann in both quarter-dose conditions ($-9.0$ and $-4.4$). In this sense the shift turns the prior from suppressing to adding false blobs relative to the unregularised reconstruction at quarter dose, by a few blobs per phantom; this is significant at $K=120$ at both strengths and at $K=30$ only at $\gamma=1.5$. The pooled counts hide a dependence on lesion size: at $\gamma=1$, for $\sigma_l=2$ PnP-const has more false blobs than FBP-Hann on the phantoms in three of the four conditions ($+10.1$, $+9.7$ and $+10.6$ at $K=30$ full and quarter dose and $K=120$ quarter dose, all significant), for $\sigma_l=4$ fewer in all four ($-24.3$, $-7.7$, $-30.9$, $-2.5$).
+At $K=120$, full dose, PnP-TVinit with almost no denoising ($\sigma_d=0.0039$) also produces $14.0$ more blobs than TV-long ($[+7.4,+22.0]$ at $\gamma=1$, for all $\sigma_l$), so at least part of the excess at $K=120$ is not due to the denoiser; we did not isolate the cause.
+In the gallery of the strongest unsupported blob per phantom (Figure~\ref{fig:galshape}, $K=60$, quarter dose) the worst blobs again occur at the same location in FBP-Hann, TV and PnP, mostly in uniform regions of the phantom, with TV reaching up to $4.6$ times the nominal lesion response and the four worst PnP-const blobs between about $2.3$ and $3$ times; in these examples the prior does not create blobs that the data do not already suggest.
+
 \begin{table}[htbp]
 \centering\small\setlength{\tabcolsep}{3pt}
-\caption{Distribution shift to phantoms (20 phantoms; mean, 95\% interval; $^*$ excludes 0). Left: false blobs per phantom at $1\times$ lesion strength, PnP-const $-$ TV, by lesion size. Right: PnP-const $-$ TV-long on the phantoms: pooled paired AUC, PSNR (dB) and SSIM.
-$K=60$ rows: AUC from four lesion types (E17b), PSNR interval from a bootstrap over the 20 phantoms (\texttt{run\_e19\_k60\_psnr\_ci.py}), SSIM not stored.}\label{tab:shift3a}
+\caption{Distribution shift to phantoms (20 phantoms; mean, 95\% interval; $^*$ excludes 0). Left: false blobs per phantom at $\gamma=1$, PnP-const $-$ TV, by lesion size. Right: PnP-const $-$ TV-long on the phantoms: pooled paired AUC, PSNR (dB) and SSIM.
+$K=60$ rows: AUC from four lesion types (E17b), PSNR interval from a bootstrap over the 20 phantoms, SSIM not stored.}\label{tab:shift3a}
 \resizebox{\linewidth}{!}{%
 \begin{tabular}{llcccccc}
 \toprule
- & & \multicolumn{2}{c}{false blobs, $1\times$} & & & & \\
-\cmidrule(lr){3-4}
+ & & \multicolumn{2}{c}{false blobs, $\gamma=1$ (vs TV)} & \multicolumn{3}{c}{vs TV-long}\\
+\cmidrule(lr){3-4}\cmidrule(lr){5-7}
 $K$ & dose & $\sigma_l=2$ & $\sigma_l=4$ & AUC & PSNR & SSIM\\
 \midrule
 30 & 1 & ${-}70.7^{*}$ {\scriptsize$[{-}107.0,{-}38.7]$} & ${-}31.8^{*}$ {\scriptsize$[{-}48.7,{-}16.8]$} & ${-}0.037$ {\scriptsize$[{-}0.113,+0.037]$} & ${-}0.11$ {\scriptsize$[{-}0.37,+0.18]$} & ${-}0.095^{*}$ {\scriptsize$[{-}0.125,{-}0.063]$} \\
@@ -1171,10 +1162,10 @@ $K$ & dose & $\sigma_l=2$ & $\sigma_l=4$ & AUC & PSNR & SSIM\\
 \bottomrule
 \end{tabular}}
 \end{table}
- 
+
 \begin{table}[htbp]
 \centering\small\setlength{\tabcolsep}{4pt}
-\caption{Mean false blobs per lesion-free image at $1\times$ nominal lesion strength (mean of $\sigma_l=2$ and $4$) on real CT slices and on the phantoms, and PnP-const $-$ FBP-Hann (mean, 95\% interval over patients or phantoms).}\label{tab:absfb3}
+\caption{Mean false blobs per lesion-free image at $\gamma=1$ (mean of $\sigma_l=2$ and $4$) on real CT slices and on the phantoms, and PnP-const $-$ FBP-Hann (mean, 95\% interval over patients or phantoms).}\label{tab:absfb3}
 \begin{tabular}{llcccccc}
 \toprule
 set & $K$, dose & FBP-Hann & TV & TV-long & PnP-const & PnP-TVinit & PnP-const $-$ FBP\\

@@ -1,27 +1,43 @@
 \begin{abstract}
+Learned image priors are often proposed to replace hand-crafted regularizers in sparse-view computed tomography (CT), yet they are usually judged by PSNR on data resembling their training set. We evaluate one noise-conditioned DnCNN denoiser used as a Plug-and-Play prior against filtered back-projection (FBP), Tikhonov and total-variation (TV) regularization, with every method tuned on validation data and all differences paired. On synthetic $28\times 28$ digit images, the prior beats box-constrained TV by about $3.4$\,dB at moderate noise ($\sigma=0.05$, 20 angles), but the advantage shrinks at low noise and reverses under distribution shift: an MNIST-trained prior is $3.1$\,dB (Fashion-MNIST) and $4.3$--$4.6$\,dB (Shepp--Logan phantom) below TV, whereas a Fashion-MNIST-trained prior beats TV by $2.2$\,dB on Fashion-MNIST, consistent with prior mismatch rather than a failure of PnP itself. In a lesion-insertion test, the prior detects lesions worse than TV in distribution despite its higher PSNR, and under mismatch it produces lesion-like false blobs far more often ($0.43$ against $0.03$ per image). On real LoDoPaB-CT slices (patient-disjoint split; 30, 60 and 120 angles; three dose levels; 40 test patients), the prior does not consistently outperform a well-tuned TV in PSNR ($-0.93$ to $+0.33$\,dB) and has lower SSIM in eight of nine conditions. Its lesion-detection AUC is higher than this TV's in all nine conditions ($+0.03$ to $+0.16$; significant in six), but never significantly higher than that of Hann-filtered FBP, which the PSNR-tuned TV falls below in detection in all nine conditions (seven significant). On non-anatomical phantoms its PSNR falls below TV in all six conditions. PSNR and lesion detectability thus rank the methods differently. Our conclusions concern one small denoiser, and the CT analysis was developed after seeing results, without pre-specified primary comparisons.
+\end{abstract}
 
-Learned image priors are often proposed as replacements for hand-crafted regularizers in sparse-view computed tomography (CT), yet they are usually judged by PSNR on data resembling
-their training set. We evaluate one noise-conditioned DnCNN denoiser used as a Plug-and-Play (PnP)
-prior in proximal gradient against filtered back-projection (FBP), Tikhonov and total-variation
-(TV) regularization, with validation-tuned parameters for every method and paired statistics,
-under distribution shift, forward-model error and Poisson noise, and with a synthetic
-lesion-insertion test (paired detection AUC, lesion retention, false lesion-like blobs).
-On synthetic $28\times28$ digit images the prior beats a box-constrained TV by about $3.4$\,dB at
-moderate noise ($\sigma=0.05$, 20 angles); the advantage shrinks at both ends of the noise range, the
-ranking near the noise-free limit depends on how the data are simulated, and it reverses under distribution
-shift: an MNIST-trained prior is $3.1$\,dB (Fashion-MNIST) and $4.3$--$4.6$\,dB (Shepp--Logan phantom)
-below TV, whereas a Fashion-MNIST-trained prior beats TV by $2.2$\,dB on Fashion-MNIST, consistent with
-prior mismatch rather than a failure of PnP itself. These results are reproduced under Poisson noise.
-On digits the prior detects small lesions less reliably than TV even in distribution, and under
-mismatch it creates lesion-like blobs more often than TV for most lesion types.
-On real LoDoPaB-CT slices (patient-disjoint split; 30, 60 and 120 of 1000 angles; 4096 photons per
-detector bin and one quarter and one tenth of that; 40 test patients) it does not consistently
-outperform a well-tuned TV given the same iteration budget (300 iterations) in PSNR ($-0.93$ to $+0.33$\,dB over
-nine conditions; at most $+0.49$\,dB when initialised from the TV solution) and has lower SSIM in eight of the
-nine, but it detects small high-contrast lesions better than that TV in all nine (paired AUC $+0.03$ to $+0.16$,
-six significant). It never significantly exceeds Hann-filtered FBP in detection, which the PSNR-tuned TV falls
-below in all nine conditions (seven significant) despite a PSNR gain of $0.8$--$2.3$\,dB. On non-anatomical
-phantoms its PSNR and SSIM deficits against TV are consistent and the detection advantage persists in one of
-six conditions. PSNR and lesion detectability thus rank the methods differently, and a learned prior's value
+\begin{comment}
+    
+\begin{abstract}
+Learned image priors are often proposed to replace hand-crafted regularizers in
+sparse-view computed tomography (CT), yet they are usually judged by PSNR on data
+resembling their training set. We evaluate one noise-conditioned DnCNN denoiser used
+as a Plug-and-Play (PnP) prior in proximal gradient against filtered back-projection
+(FBP), Tikhonov and total-variation (TV) regularization. Every method is tuned on
+validation data and differences are paired. We test distribution shift, forward-model
+error, Poisson noise, and a synthetic lesion-insertion task (paired detection AUC with a
+location-known observer, lesion retention, false lesion-like blobs), all at PSNR-tuned
+operating points.
+On synthetic $28\times28$ digit images the prior beats a box-constrained TV by about
+$3.4$\,dB at moderate noise ($\sigma=0.05$, 20 angles). The advantage shrinks at both
+ends of the noise range: at $\sigma=0$ TV is ahead under every data model tested, and at
+$\sigma=0.01$ the sign depends on the data model and on the TV solver. It reverses under
+distribution shift: an MNIST-trained prior is $3.1$\,dB (Fashion-MNIST) and
+$4.3$--$4.6$\,dB (Shepp--Logan phantom) below TV, whereas a Fashion-MNIST-trained prior
+beats TV by $2.2$\,dB on Fashion-MNIST, consistent with prior mismatch rather than a
+failure of PnP itself. These results are reproduced under Poisson noise. On digits the
+prior detects small lesions less reliably than TV even in distribution, and under
+mismatch it creates more lesion-like blobs than box-constrained TV for seven of eight
+lesion types.
+On real LoDoPaB-CT slices (patient-disjoint split; 30, 60 and 120 of 1000 angles; three
+dose levels; 40 test patients, one noise realisation per condition) the prior does not
+consistently outperform a well-tuned TV run for 300 iterations: PSNR differences range
+from $-0.93$ to $+0.33$\,dB over nine conditions (at most $+0.49$\,dB when initialised
+from the TV solution), and SSIM is lower in eight of nine. It detects small high-contrast
+lesions better than this TV in all nine conditions (paired AUC $+0.03$ to $+0.16$, six
+significant), but the advantage is negligible against the 150-iteration TV at full dose
+for 30 and 60 angles. It never significantly exceeds Hann-filtered FBP in detection,
+which the PSNR-tuned TV falls below in all nine conditions (seven significant) despite a
+PSNR gain of $0.8$--$2.3$\,dB over FBP. On non-anatomical phantoms its PSNR and SSIM
+deficits against TV are consistent, and the detection advantage is significant in one of
+six conditions. PSNR and lesion detectability thus rank the methods differently. Our
+conclusions concern one small denoiser; on digits, the value of the learned prior
 depends on how well it matches the data it is applied to.
 \end{abstract}
+\end{comment}

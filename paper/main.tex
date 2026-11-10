@@ -1,11 +1,10 @@
 \documentclass[11pt]{article}
 
 \usepackage[margin=1in]{geometry}
+
 \usepackage{amsmath,amssymb}
 \usepackage{graphicx}
 \usepackage{booktabs}
-\usepackage[colorlinks=true,linkcolor=blue!50!black,citecolor=blue!50!black,urlcolor=blue!50!black]{hyperref}
-\usepackage[numbers,sort&compress]{natbib}
 \usepackage{xcolor}
 \usepackage{algorithm}
 \usepackage{algpseudocode}
@@ -13,14 +12,25 @@
 \usepackage{subcaption}
 \usepackage{comment}
 \usepackage{tabularx}
-\usepackage{booktabs}
 \usepackage{array}
 
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage[
+    colorlinks=true,
+    linkcolor=blue!50!black,
+    citecolor=blue!50!black,
+    urlcolor=blue!50!black,
+    backref=page
+]{hyperref}
 
 \title{\LARGE\textbf{Learned Regularization for Sparse-View CT:}\\[4pt]
 \large\textbf{Accuracy, Lesion Detectability and Distribution Shift of a\\
 Plug-and-Play Prior against Tuned Total Variation}}
-\author{Mohammed Abo Oraig \\ \small Independent research \\ \small \texttt{mohammed-abo-oraig@etud.univ-tln.fr}}
+
+\author{Mohammed Abo Oraig \\ 
+\small Independent research \\ 
+\small \texttt{mohammed-abo-oraig@etud.univ-tln.fr}}
+
 \date{}
 
 \begin{document}
@@ -46,9 +56,7 @@ Plug-and-Play Prior against Tuned Total Variation}}
 
 \input{REPRODUCIBILITY}
 
-
 \bibliographystyle{plainnat}
 \bibliography{references}
-
 
 \end{document}

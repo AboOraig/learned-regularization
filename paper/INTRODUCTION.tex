@@ -19,13 +19,13 @@ with a hand-crafted penalty $R$ such as Tikhonov or total variation (TV) \citep{
 Learned priors replace $R$ by statistics estimated from data. End-to-end networks, including unrolled
 iterations, are trained for a given operator and noise level \citep{jin2017,adler2018}. Denoiser-based methods,
 Plug-and-Play (PnP) \citep{venkatakrishnan2013plugandplay} and regularization by denoising \citep{romano2017}
-(reviewed in \citealt{kamilov2023}), instead insert a trained denoiser such as DnCNN \citep{zhang2017dncnn}
+(reviewed in \citep{kamilov2023}), instead insert a trained denoiser such as DnCNN \citep{zhang2017dncnn}
 in place of the proximal operator of $R$ in an iterative scheme. Learned methods can be much more accurate than
-classical reconstruction on large benchmarks: in the LoDoPaB-CT dataset paper, FBP followed by a U-Net improves
-the test PSNR from $30.5$ to $35.8$\,dB over FBP \citep{leuschner2021}. We study PnP with a DnCNN prior because
-the prior is trained once, independently of the operator and of the noise level, so the same prior can be placed
-in the same data-fidelity iteration as the classical baselines and tested when the geometry, the dose or the
-image distribution changes. We make no claim about end-to-end networks trained for a specific task.
+classical reconstruction on large benchmarks: in the LoDoPaB-CT dataset paper, FBP followed by a U-Net improves the PSNR by several dB over FBP \citep{leuschner2021}. We study PnP with a DnCNN prior because
+the prior is trained once, independently of the operator, so the same prior can be placed in the same
+data-fidelity iteration as the classical baselines and tested when the geometry, the dose or the image
+distribution changes. We make no claim about end-to-end networks trained for a specific task, and our
+conclusions concern one small denoiser architecture.
 
 Reconstruction methods are usually compared by PSNR and SSIM on test images drawn from the distribution of the
 training set. Several concerns are known to be left open by such comparisons. Learned reconstructions can be
@@ -41,47 +41,43 @@ This paper is an evaluation study, not a new method. It asks three questions abo
 tuned FBP, Tikhonov and TV reconstruction:
 \begin{enumerate}
 \item[\textbf{Q1}] Does the learned prior keep its advantage over TV when the image distribution changes?
-\item[\textbf{Q2}] Can we find cases where it creates convincing but incorrect structure?
+\item[\textbf{Q2}] Can we find cases where it creates lesion-like structure that the ground truth does not
+support, as measured by a location-known local-contrast statistic?
 \item[\textbf{Q3}] Do the conclusions hold over a range of noise levels and reconstruction conditions?
 \end{enumerate}
-We answer them at two scales. In a controlled setting of $28\times28$ digit images (MNIST-derived), every
-component can be varied and repeated: noise level, number of angles, forward-model error, denoiser seeds,
-and a prior trained on the shifted distribution as a control; the same questions are then examined with a
-matrix-free operator and Poisson noise. We then ask which conclusions survive on real $362\times362$ slices of
-LoDoPaB-CT with a patient-disjoint split, three angle counts and three dose levels. Throughout, the data are split
-into disjoint training, validation and test sets; every method is tuned on the validation set for each
-condition (and frozen for robustness tests); differences are paired and reported with confidence intervals; the
-measurements are simulated on a finer grid than the reconstruction grid to avoid the inverse crime
-\citep{wirgin2004}; and, besides PSNR and SSIM, we measure the detectability of synthetic lesions inserted into the
-images (paired AUC, lesion retention and false lesion-like blobs).
+We answer them at two scales. In a controlled setting of $28\times28$ digit images (MNIST-derived), noise level,
+number of angles, forward-model error, denoiser seeds and the training distribution of the prior can all be varied
+and repeated; the same questions are then examined with a matrix-free operator and Poisson noise. We then ask which
+conclusions survive on real $362\times362$ slices of LoDoPaB-CT with a patient-disjoint split, three angle counts
+and three dose levels. In every experiment the data are split into disjoint training, validation and test sets,
+each method is tuned on the validation set for each condition, and differences are paired (Section~\ref{sec:method}).
+Besides PSNR and SSIM, we measure the detectability of synthetic lesions inserted into the images (paired AUC,
+lesion retention and false lesion-like blobs). The first digit experiments (E1--E5) use inverse-crime data; later
+experiments simulate the measurements on a finer grid \citep{wirgin2004}, and
+Section~\ref{sec:crime-results} quantifies the difference.
 
-In the digit-image setting the prior beats TV by up to $3.4$\,dB over a box-constrained TV at moderate noise but loses to it, by $3.1$ and
-$4.3$\,dB, when an MNIST-trained prior is applied to Fashion-MNIST or a Shepp--Logan phantom, and a matched prior
-restores the advantage, which points to prior mismatch rather than to the PnP scheme. On real CT the prior does not
-consistently beat a well-tuned TV in PSNR ($-0.93$ to $+0.33$\,dB over nine conditions) but detects small lesions
-better than TV in all nine, without exceeding Hann-filtered FBP, whereas TV tuned for PSNR detects them worse than
-FBP in all nine; under a shift to non-anatomical phantoms the detection advantage persists in one of six conditions.
+In brief: on digits a matched prior beats TV by about $3.4$\,dB at moderate noise, and a mismatched prior loses to
+it by $3.1$--$4.6$\,dB. On real CT, one PnP-DnCNN prior is roughly on par with a well-tuned TV in PSNR and slightly
+below it in SSIM, yet it detects small high-contrast lesions better than that TV (significantly in six of nine
+conditions), which itself detects them worse than plain FBP.
 
 Our contributions are:
 \begin{itemize}
 \item An evaluation protocol for comparing a PnP prior with classical regularization: per-condition tuning of
-every method, a TV control with the same iteration budget as the PnP scheme, paired statistics over test images or
-patients, and crime-free data generation with a sensitivity analysis (Section~\ref{sec:crime-results}).
-\item Robustness evidence on digit images: forward-model mismatch, distribution shift with a matched-prior and a
-seed control, an analysis of why PnP-PGD needs early stopping, and an error decomposition along the singular
-vectors of the forward operator (Sections~\ref{sec:crime-results}--\ref{sec:seeds-results}).
-\item A task-based lesion-insertion evaluation, with an operating-point study asking whether the loss in
-detectability can be removed by re-tuning (Sections~\ref{sec:lesion-results} and \ref{sec:oppoint-results}).
-\item A matrix-free operator with exact adjoint, validated against the dense operator at $28\times28$, and a
-Poisson-noise study showing that the digit-image rankings and the shift reversal persist under it
+every method, a TV control run for twice the iterations (TV-long), paired statistics, and data generation on a
+finer grid with a sensitivity analysis (Section~\ref{sec:crime-results}).
+\item Robustness evidence on digit images: forward-model mismatch, distribution shift with matched-prior and seed
+controls, the effect of the iteration count, and an error decomposition along the singular vectors of the forward
+operator (Sections~\ref{sec:e3}--\ref{sec:seeds-results}).
+\item A lesion-insertion evaluation with an operating-point study of whether re-tuning can restore detectability
+(Sections~\ref{sec:lesion-results} and \ref{sec:oppoint-results}).
+\item A matrix-free operator with exact adjoint, validated against the dense one, and a Poisson-noise study
 (Sections~\ref{sec:mf-results}--\ref{sec:lesion-poisson}).
-\item A patient-disjoint study on LoDoPaB-CT over three angle counts and three doses, with the simulator checked
-against real observations and a shift to non-anatomical phantoms (Sections~\ref{sec:e14}--\ref{sec:e19}). The study
-reports negative and mixed results, a retracted early comparison, and the analysis steps taken after seeing
-results (Section~\ref{sec:history3}); nothing was pre-specified.
+\item A patient-disjoint study on LoDoPaB-CT over three angle counts and three doses, with a simulator check and a
+shift to non-anatomical phantoms (Sections~\ref{sec:e14}--\ref{sec:e19}). The study reports negative and mixed
+results, an early comparison that we discarded, and the analysis steps taken after seeing results
+(Section~\ref{sec:history3}); nothing was pre-specified.
 \end{itemize}
 
-The paper is organised as follows. Section~\ref{sec:related} reviews related work, Section~\ref{sec:method}
-describes the methods and the evaluation protocol, Section~\ref{sec:experiments} reports experiments E1--E19,
-Section~\ref{sec:discussion} answers the three questions, and the limitations and the reproducibility information
-close the paper.
+Section~\ref{sec:related} reviews related work, Section~\ref{sec:method} the methods, Section~\ref{sec:experiments}
+reports experiments E1--E19, and Section~\ref{sec:discussion} answers the three questions.

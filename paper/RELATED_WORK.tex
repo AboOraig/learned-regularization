@@ -6,55 +6,50 @@
 \paragraph{Variational regularization.} Tikhonov regularization and total variation (TV) \citep{rudin1992tv}
 remain standard baselines for ill-posed inverse problems because they are convex, well understood and
 simple to tune. TV is a strong prior for piecewise-constant images, which makes it a competitive baseline
-for digit-like data and a natural reference for CT.
+for digit-like data and a natural reference for CT. TV has long been used for sparse-view CT~\citep{sidky2008tv}.
 
 \paragraph{Learned CT reconstruction.} Deep networks have been used to post-process filtered
 back-projection images \citep{jin2017}, to unroll iterative reconstruction \citep{adler2018}, and, more
-recently, as generative priors for sparse-view CT and accelerated MRI \citep{song2022}. On the LoDoPaB-CT
-benchmark, FBP followed by a U-Net improves the test PSNR from $30.5$ to $35.8$\,dB over FBP
-\citep{leuschner2021}. These methods are trained for a given operator and noise level. We instead study the
-Plug-and-Play family, in which the prior is trained once and the data-fidelity step stays explicit, so that
-the prior can be compared with classical regularizers inside the same iteration; our conclusions concern
-this family and a small denoiser, not end-to-end networks.
+recently, as generative priors for sparse-view CT and accelerated MRI \citep{song2022}. These methods, and
+the LoDoPaB-CT benchmark results cited in the Introduction \citep{leuschner2021}, are trained for a given
+operator and noise level. We instead study the Plug-and-Play family, in which the prior is trained once and
+the data-fidelity step stays explicit, so that the prior can be compared with classical regularizers inside
+the same iteration; our conclusions concern this family and a small denoiser, not end-to-end networks.
 
 \paragraph{Plug-and-Play and denoiser-based priors.}
 \citet{venkatakrishnan2013plugandplay} proposed replacing the proximal operator of a variational regularizer by
 an off-the-shelf denoiser inside an ADMM or proximal-gradient iteration; regularization by denoising
-\citep{romano2017} is a related formulation, and \citet{kamilov2023} review the field. CNN denoisers were
-introduced as plug-in priors by \citet{zhang2017ircnn}. Convergence results require assumptions on the denoiser,
+\citep{romano2017} is a related formulation, and \citet{kamilov2023} review the field. CNN denoisers were used
+as plug-in priors by \citet{zhang2017ircnn}. DnCNN \citep{zhang2017dncnn} uses residual learning for Gaussian
+denoising and, in its blind form, is trained over a range of noise levels; FFDNet \citep{zhang2018ffdnet}
+instead receives the noise level as an input. We use a DnCNN-style residual network with the noise level as an
+additional input channel, so that one network serves every denoising strength $\sigma_d$ tried in the PnP
+iteration, where $\sigma_d$ is a tuned hyperparameter. Convergence results require assumptions on the denoiser,
 such as boundedness or a Lipschitz constraint \citep{chan2016pnp,ryu2019pnp}; an unconstrained CNN denoiser
 comes with no such guarantee, which is relevant to the peak-then-decay behaviour we observe in
-Section~\ref{sec:experiments}.
+Section~\ref{sec:e5}. Convergent variants constrain the denoiser, for example as a gradient step~\citep{hurault2022gradient}, and strong deep denoisers with noise-level schedules~\citep{zhang2022dpir} are the usual practical choice; we use neither.
 
-\paragraph{Noise-conditioned denoisers.} DnCNN \citep{zhang2017dncnn} uses residual learning for Gaussian
-denoising and, in its blind form, is trained over a range of noise levels. FFDNet \citep{zhang2018ffdnet}
-instead receives the noise level as an input. We use a DnCNN-style residual network with the noise level
-as an additional input channel, so that one network serves every denoising strength $\sigma_d$ tried in the
-PnP iteration, where $\sigma_d$ is a tuned hyperparameter.
-
-\paragraph{Instabilities, robustness and distribution shift.} \citet{antun2020instabilities} showed, for
-MRI and CT networks, that tiny perturbations can cause severe artefacts, that small structural changes
-may be missed, and that sparsity-based benchmarks including TV were unaffected in their examples.
+\paragraph{Instabilities, robustness and distribution shift.} \citet{antun2020instabilities} reported, for
+MRI and CT networks, severe artefacts from tiny perturbations, missed small structural changes, and no such
+instability for the sparsity-based methods (including TV) in their examples.
 \citet{darestani2021shift} measured the robustness of trained and untrained reconstruction methods in
 accelerated MRI and found that both suffer similarly from distribution shifts and that the better-performing
 deep methods do not lose robustness. Our shifts are natural (another image class, a different kind of
-phantom) rather than adversarial, our prior is a small PnP denoiser, and the shifts are larger than within-domain
-variation; we report a reversal of the advantage over TV for a mismatched prior (Section~\ref{sec:discussion}),
-and we do not claim that it holds for other learned methods.
+phantom) rather than adversarial, our prior is a small PnP denoiser, and the shifts are larger than
+within-domain variation; we report a reversal of the advantage over TV for a mismatched prior
+(Sections~\ref{sec:seeds-results} and \ref{sec:discussion}), and we do not claim that it holds for other
+learned methods.
 
 \paragraph{Hallucinations, the inverse crime and task-based assessment.}
 \citet{bhadra2021} define hallucinations in tomographic reconstruction as errors in image components that the
-measurements cannot stably determine, which can come only from the prior. In a stylised 2D MRI setting
-they found that a U-Net produced more null-space hallucinations on out-of-distribution data, where its advantage
-over non-learned methods disappeared. We adopt this view and extend the decomposition to the weakly determined
-subspace of a finite-precision operator (Section~\ref{sec:subspace}). Our setting differs in the modality (CT),
-the prior (a PnP denoiser), the controls (a prior trained on the shifted distribution, denoiser seeds, a TV
-reference with the same iteration budget) and the evidence (a lesion-insertion test, and real data over a grid of
-doses and angle counts). Generating data with the discrete model that is later inverted is known as the inverse
-crime \citep{wirgin2004,kaipio2005} and tends to overstate the accuracy of methods that exploit the exact model;
-we remove it in Section~\ref{sec:crimefree}. Finally, we follow the task-based view of image quality
-\citep{barrett1993,barrett2004}: fidelity metrics such as PSNR need not predict whether a feature of interest
-survives reconstruction, so we also measure the detection of inserted lesions with a location-known statistic and
-count lesion-like false blobs in lesion-free reconstructions.
-
-s
+measurements cannot stably determine, which can come only from the prior; in a stylised MRI setting they
+found more such errors for a U-Net on out-of-distribution data. We adopt this view and extend the decomposition
+to the weakly determined subspace of a finite-precision operator (Section~\ref{sec:subspace}). Our setting
+differs in the modality (CT), the prior (a PnP denoiser), the controls (a prior trained on the shifted
+distribution, denoiser seeds, a longer-running TV) and the evidence (a lesion-insertion test, and real data over
+a grid of doses and angle counts). Generating data with the discrete model that is later inverted is known as
+the inverse crime \citep{wirgin2004,kaipio2005} and tends to overstate the accuracy of methods that exploit the
+exact model; we reduce it in Section~\ref{sec:crimefree}. Finally, we follow the task-based view of image
+quality \citep{barrett1993,barrett2004}: fidelity metrics such as PSNR need not predict whether a feature of
+interest survives reconstruction, so we also measure the detection of inserted lesions with a location-known
+statistic and count lesion-like false blobs in lesion-free reconstructions.
