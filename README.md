@@ -7,7 +7,7 @@ A noise-conditioned DnCNN denoiser is used as a Plug-and-Play (PnP) prior inside
 FBP, Tikhonov and total-variation (TV) regularization under noise, undersampling, forward-model error, distribution
 shift and a lesion-detection task, first on 28x28 digit images and then on real clinical-size CT slices (LoDoPaB-CT).
 
-- **Paper:** [paper/Learned_Regularization.pdf](paper/Learned_Regularization.pdf) (source: `paper/main.tex`). Preprint link: *to be added*.
+- **Paper:** [Learned_Regularization.pdf](paper/Learned_Regularization.pdf) (source: [`paper/main.tex`](paper/main.tex)). [Preprint (Zenodo)](https://doi.org/10.5281/zenodo.24107061).
 - **Results companion: one card per experiment:** [REPORT.md](REPORT.md).
 - **Everything is reproducible from this repository:** code, trained models, raw per-image results and figure scripts.
 
